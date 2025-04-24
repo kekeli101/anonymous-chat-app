@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anonymous Chat</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <!-- Greeting Page -->
+    <div id="greeting-page" class="page active">
+        <div class="container">
+            <h1>Anonymous Chat</h1>
+            <p>Create or join a room to start chatting anonymously</p>
+            <div class="button-group">
+                <button id="create-room-btn" class="btn primary">Create Room</button>
+                <button id="join-room-btn" class="btn secondary">Join Room</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Join Room Page -->
+    <div id="join-room-page" class="page">
+        <div class="container">
+            <h1>Join Room</h1>
+            <p>Enter the 6-digit room key to join</p>
+            <div class="input-group">
+                <input type="text" id="room-key-input" placeholder="Room Key" maxlength="6" pattern="[0-9]{6}">
+                <div class="error-message" id="join-error-message"></div>
+            </div>
+            <div class="button-group">
+                <button id="join-submit-btn" class="btn primary">Join</button>
+                <button id="join-back-btn" class="btn secondary">Back</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Room Page -->
+    <div id="chat-room-page" class="page">
+        <div class="chat-container">
+            <div class="chat-header">
+                <div class="room-info">
+                    <h2>Room: <span id="room-key-display"></span></h2>
+                    <p>You are: <span id="username-display"></span></p>
+                </div>
+                <div class="admin-controls" id="admin-controls">
+                    <button id="close-room-btn" class="btn danger">Close Room</button>
+                </div>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                <div class="welcome-message">
+                    <p>Welcome to the chat room! You can now start chatting anonymously.</p>
+                    <p class="room-key-info">Room Key: <span id="room-key-info"></span> <button id="copy-room-key" class="btn-icon"><i class="fas fa-copy"></i></button></p>
+                </div>
+            </div>
+            <div class="chat-input">
+                <input type="text" id="message-input" placeholder="Type your message...">
+                <button id="send-message-btn"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
