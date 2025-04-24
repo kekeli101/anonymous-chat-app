@@ -13,7 +13,7 @@ This is a simple real-time anonymous chat application where users can create or 
 
 ## How to Access
 The application is deployed and accessible online at:
-http://3001-ignvueq8g6h9t7si978dg-e80c6714.manus.computer
+(https://anonymous-chat-app-vhd5.onrender.com)
 
 ## How to Use
 
