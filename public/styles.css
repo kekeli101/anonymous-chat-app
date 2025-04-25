@@ -154,6 +154,19 @@ input[type="text"]:focus {
     color: rgba(255, 255, 255, 0.8);
 }
 
+.user-count {
+    background-color: rgba(255, 255, 255, 0.2);
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    margin-right: 1rem;
+}
+
+.user-count p {
+    margin: 0;
+    color: white;
+}
+
 .chat-messages {
     flex: 1;
     padding: 1rem;
@@ -181,6 +194,9 @@ input[type="text"]:focus {
     border-radius: 8px;
     max-width: 80%;
     word-wrap: break-word;
+    position: relative;
+    transition: transform 0.2s ease;
+    touch-action: pan-y;
 }
 
 .message .username {
@@ -204,11 +220,78 @@ input[type="text"]:focus {
     margin-right: auto;
 }
 
+.message.swiping {
+    transform: translateX(40px);
+}
+
+.message .swipe-hint {
+    position: absolute;
+    left: -30px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #3498db;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.message.swiping .swipe-hint {
+    opacity: 1;
+}
+
 .system-message {
     text-align: center;
     font-style: italic;
     color: #7f8c8d;
     margin: 0.5rem 0;
+}
+
+.reply-container {
+    display: none;
+    background-color: #f0f8ff;
+    padding: 0.5rem 1rem;
+    border-top: 1px solid #ddd;
+}
+
+.reply-container.active {
+    display: block;
+}
+
+.reply-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.reply-text {
+    border-left: 3px solid #3498db;
+    padding-left: 0.5rem;
+    font-size: 0.9rem;
+    color: #7f8c8d;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 90%;
+}
+
+.reply-username {
+    font-weight: bold;
+    color: #3498db;
+    margin-right: 0.5rem;
+}
+
+.reply-quote {
+    background-color: rgba(52, 152, 219, 0.1);
+    border-left: 3px solid #3498db;
+    padding: 0.3rem 0.5rem;
+    margin-bottom: 0.5rem;
+    border-radius: 2px;
+    font-size: 0.85rem;
+}
+
+.reply-quote-username {
+    font-weight: bold;
+    color: #3498db;
+    font-size: 0.8rem;
 }
 
 .chat-input {
@@ -254,6 +337,11 @@ input[type="text"]:focus {
     .chat-header {
         flex-direction: column;
         align-items: flex-start;
+    }
+    
+    .user-count {
+        margin-top: 0.3rem;
+        margin-bottom: 0.3rem;
     }
     
     .admin-controls {
