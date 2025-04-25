@@ -23,8 +23,8 @@ const io = socketIo(server, {
 // Store active rooms
 const activeRooms = new Map();
 
-// Get port from command line arguments or use default
-const PORT = process.env.PORT || process.argv[2]?.split('=')[1] || 3001;
+// Get port from environment variable or use default
+const PORT = process.env.PORT || 3000;
 
 // Generate a random 6-digit room key
 function generateRoomKey() {
@@ -61,7 +61,8 @@ io.on('connection', (socket) => {
     activeRooms.set(roomKey, {
       admin: socket.id,
       users: new Map([[socket.id, username]]),
-      createdAt: new Date()
+      createdAt: new Date(),
+      messages: [] // Store messages for reply functionality
     });
     
     // Join the room
@@ -71,7 +72,8 @@ io.on('connection', (socket) => {
     socket.emit('roomCreated', {
       roomKey,
       username,
-      isAdmin: true
+      isAdmin: true,
+      userCount: 1 // Initial user count
     });
     
     console.log(`Room created: ${roomKey} by ${username} (${socket.id})`);
@@ -100,13 +102,16 @@ io.on('connection', (socket) => {
     socket.emit('roomJoined', {
       roomKey,
       username,
-      isAdmin: socket.id === room.admin
+      isAdmin: socket.id === room.admin,
+      userCount: room.users.size, // Current user count
+      messages: room.messages // Send existing messages for history
     });
     
     // Notify other users in the room
     socket.to(roomKey).emit('userJoined', {
       username,
-      timestamp: new Date()
+      timestamp: new Date(),
+      userCount: room.users.size // Updated user count
     });
     
     console.log(`User joined room: ${roomKey} as ${username} (${socket.id})`);
@@ -114,7 +119,7 @@ io.on('connection', (socket) => {
   
   // Send a message to the room
   socket.on('sendMessage', (data) => {
-    const { roomKey, message } = data;
+    const { roomKey, message, replyTo } = data;
     
     // Check if room exists
     if (!activeRooms.has(roomKey)) {
@@ -125,12 +130,25 @@ io.on('connection', (socket) => {
     const room = activeRooms.get(roomKey);
     const username = room.users.get(socket.id);
     
-    // Broadcast message to all users in the room
-    io.to(roomKey).emit('newMessage', {
+    // Create message object with unique ID
+    const messageObj = {
+      id: Date.now() + Math.random().toString(36).substr(2, 5), // Generate unique ID
       username,
       message,
-      timestamp: new Date()
-    });
+      timestamp: new Date(),
+      replyTo // Include reply information if present
+    };
+    
+    // Store message in room history
+    room.messages.push(messageObj);
+    
+    // Limit message history to prevent memory issues (keep last 100 messages)
+    if (room.messages.length > 100) {
+      room.messages = room.messages.slice(-100);
+    }
+    
+    // Broadcast message to all users in the room
+    io.to(roomKey).emit('newMessage', messageObj);
     
     console.log(`Message in room ${roomKey} from ${username}: ${message}`);
   });
@@ -179,7 +197,8 @@ io.on('connection', (socket) => {
         // Notify other users in the room
         socket.to(roomKey).emit('userLeft', {
           username,
-          timestamp: new Date()
+          timestamp: new Date(),
+          userCount: room.users.size // Updated user count
         });
         
         console.log(`User left room: ${roomKey} - ${username} (${socket.id})`);
@@ -212,9 +231,16 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-// Start server
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+// For Vercel serverless functions
+if (process.env.VERCEL) {
+  // Export the express app for Vercel serverless deployment
+  module.exports = app;
+} else {
+  // Start server for local development
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
 
-module.exports = { app, server };
+// Export for Vercel
+module.exports = app;
