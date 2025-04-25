@@ -6,6 +6,7 @@
     <title>Anonymous Chat</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
 </head>
 <body>
     <!-- Greeting Page -->
@@ -44,6 +45,9 @@
                     <h2>Room: <span id="room-key-display"></span></h2>
                     <p>You are: <span id="username-display"></span></p>
                 </div>
+                <div class="user-count">
+                    <p>Users in room: <span id="user-count-display">1</span></p>
+                </div>
                 <div class="admin-controls" id="admin-controls">
                     <button id="close-room-btn" class="btn danger">Close Room</button>
                 </div>
@@ -52,6 +56,15 @@
                 <div class="welcome-message">
                     <p>Welcome to the chat room! You can now start chatting anonymously.</p>
                     <p class="room-key-info">Room Key: <span id="room-key-info"></span> <button id="copy-room-key" class="btn-icon"><i class="fas fa-copy"></i></button></p>
+                </div>
+            </div>
+            <div class="reply-container" id="reply-container">
+                <div class="reply-content">
+                    <div class="reply-text">
+                        <span class="reply-username" id="reply-username"></span>
+                        <span id="reply-message"></span>
+                    </div>
+                    <button id="cancel-reply" class="btn-icon"><i class="fas fa-times"></i></button>
                 </div>
             </div>
             <div class="chat-input">
