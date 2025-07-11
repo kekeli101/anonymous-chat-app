@@ -368,9 +368,4 @@ input[type="text"]:focus {
     animation: fadeIn 0.3s ease;
 }
   
-    footer {
-      text-align: center;
-      color: #888; /* Faded gray */
-      padding: 1em;
-      background: #f0f0f0;
-    }
+
