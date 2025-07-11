@@ -125,8 +125,8 @@ function addMessage(messageObj, isOwnMessage = false) {
         this.classList.remove('swiping');
     });
     
-    // Scroll to bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Scroll to bottom (auto-scroll disabled by user request)
+    // chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 function startReply(messageId) {
@@ -158,8 +158,8 @@ function addSystemMessage(message) {
     
     chatMessages.appendChild(messageElement);
     
-    // Scroll to bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Scroll to bottom (auto-scroll disabled by user request)
+    // chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 // Event listeners
