@@ -205,15 +205,21 @@ io.on('connection', (socket) => {
         
         // If user was admin, close the room
         if (socket.id === room.admin) {
-          // Notify all users in the room
-          io.to(roomKey).emit('roomClosed', {
-            message: 'The room has been closed because the admin left'
-          });
-          
-          // Remove room
-          activeRooms.delete(roomKey);
-          
-          console.log(`Room closed (admin left): ${roomKey}`);
+          // Find a new admin
+          const remainingUsers = Array.from(room.users.keys()).filter(id => id !== socket.id);
+          if (remainingUsers.length > 0) {
+            const newAdminId = remainingUsers[0]; // Or choose based on other criteria
+            room.admin = newAdminId;
+            io.to(roomKey).emit("adminChanged", { newAdminId, message: `Admin role transferred to ${room.users.get(newAdminId)}` });
+            console.log(`Admin role in room ${roomKey} transferred to ${room.users.get(newAdminId)}`);
+          } else {
+            // If no other users, then close the room (optional, based on desired behavior)
+            io.to(roomKey).emit("roomClosed", {
+              message: "The room has been closed because the admin left and no other users remained"
+            });
+            activeRooms.delete(roomKey);
+            console.log(`Room closed (admin left, no users): ${roomKey}`);
+          }
         }
         
         // If room is empty, remove it
