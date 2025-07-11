@@ -63,3 +63,9 @@ The application is deployed and accessible online at:
 - Chat history is not preserved if you refresh the page
 - No file sharing capabilities
 - No user authentication or registration
+
+##Screenshots
+<img width="1366" height="768" alt="Screenshot (95)" src="https://github.com/user-attachments/assets/c61fbd8d-6736-4d82-80aa-1080b45c4c3a" />
+<img width="1366" height="768" alt="Screenshot (94)" src="https://github.com/user-attachments/assets/28c8f892-3426-444f-bca0-ce78290de433" />
+<img width="1366" height="768" alt="Screenshot (93)" src="https://github.com/user-attachments/assets/91617165-55a4-4287-85a2-e73671267abd" />
+<img width="1366" height="768" alt="Screenshot (92)" src="https://github.com/user-attachments/assets/38bde0a6-26d5-49a9-ae1d-f2e229f347bd" />
