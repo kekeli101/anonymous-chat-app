@@ -30,6 +30,15 @@ p {
     color: #7f8c8d;
 }
 
+
+    footer {
+      text-align: center;
+      color: #888; /* Faded gray */
+      padding: 1em;
+      background: #f0f0f0;
+    }
+  
+
 /* Button Styles */
 .btn {
     padding: 0.8rem 1.5rem;
