@@ -212,15 +212,29 @@ messageInput.addEventListener('keypress', (e) => {
 });
 
 copyRoomKeyBtn.addEventListener('click', () => {
-    navigator.clipboard.writeText(currentRoom)
+    const inviteLink = `${window.location.origin}/?room=${currentRoom}`;
+    navigator.clipboard.writeText(inviteLink)
         .then(() => {
-            alert('Room key copied to clipboard!');
+            alert('Invitation link copied to clipboard!');
         })
         .catch(err => {
             console.error('Could not copy text: ', err);
         });
 });
+// ...
 
+// Initialize (New logic added at the end of the file)
+const urlParams = new URLSearchParams(window.location.search);
+const roomKeyFromUrl = urlParams.get('room');
+
+if (roomKeyFromUrl && /^\d{6}$/.test(roomKeyFromUrl)) {
+    // Pre-fill the join room input and show the join page
+    roomKeyInput.value = roomKeyFromUrl;
+    showPage(joinRoomPage);
+    joinSubmitBtn.click(); // Automatically attempt to join
+} else {
+    showPage(greetingPage);
+}
 function sendMessage() {
     const message = messageInput.value.trim();
     
