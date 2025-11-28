@@ -303,6 +303,17 @@ input[type="text"]:focus {
     font-size: 0.8rem;
 }
 
+.typing-indicator {
+    height: 20px;
+    padding: 0 1rem;
+    font-size: 0.8em;
+    color: #888;
+    line-height: 20px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
 .chat-input {
     display: flex;
     padding: 1rem;

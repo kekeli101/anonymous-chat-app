@@ -32,6 +32,8 @@ const replyUsername = document.getElementById('reply-username');
 const replyMessage = document.getElementById('reply-message');
 const cancelReplyBtn = document.getElementById('cancel-reply');
 
+const typingIndicator = document.getElementById('typing-indicator');
+
 // App state
 let currentRoom = null;
 let currentUsername = null;
@@ -208,7 +210,23 @@ sendMessageBtn.addEventListener('click', () => {
 messageInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         sendMessage();
+    } else {
+        // Emit typing event
+        if (currentRoom) {
+            socket.emit('typing', { roomKey: currentRoom });
+        }
     }
+});
+
+// Logic to stop typing after a delay
+let typingTimeout = null;
+messageInput.addEventListener('keyup', () => {
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+        if (currentRoom) {
+            socket.emit('stopTyping', { roomKey: currentRoom });
+        }
+    }, 1500); // 1.5 seconds delay
 });
 
 copyRoomKeyBtn.addEventListener('click', () => {
@@ -321,6 +339,36 @@ socket.on('newMessage', (data) => {
     const isOwnMessage = data.username === currentUsername;
     addMessage(data, isOwnMessage);
 });
+
+// Typing indicator handlers
+const typingUsers = new Set();
+
+socket.on('userTyping', (data) => {
+    if (data.username !== currentUsername) {
+        typingUsers.add(data.username);
+        updateTypingIndicator();
+    }
+});
+
+socket.on('userStopTyping', (data) => {
+    typingUsers.delete(data.username);
+    updateTypingIndicator();
+});
+
+function updateTypingIndicator() {
+    const users = Array.from(typingUsers);
+    let text = '';
+
+    if (users.length === 1) {
+        text = `${users[0]} is typing...`;
+    } else if (users.length === 2) {
+        text = `${users[0]} and ${users[1]} are typing...`;
+    } else if (users.length > 2) {
+        text = `${users.length} people are typing...`;
+    }
+
+    typingIndicator.textContent = text;
+}
 
 socket.on('userJoined', (data) => {
     addSystemMessage(`${data.username} has joined the room`);

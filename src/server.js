@@ -153,6 +153,25 @@ io.on('connection', (socket) => {
     console.log(`Message in room ${roomKey} from ${username}: ${message}`);
   });
   
+  // Typing indicator
+  socket.on('typing', (data) => {
+    const { roomKey } = data;
+    const room = activeRooms.get(roomKey);
+    if (room && room.users.has(socket.id)) {
+      const username = room.users.get(socket.id);
+      socket.to(roomKey).emit('userTyping', { username });
+    }
+  });
+
+  socket.on('stopTyping', (data) => {
+    const { roomKey } = data;
+    const room = activeRooms.get(roomKey);
+    if (room && room.users.has(socket.id)) {
+      const username = room.users.get(socket.id);
+      socket.to(roomKey).emit('userStopTyping', { username });
+    }
+  });
+
   // Close the room (admin only)
   socket.on('closeRoom', (data) => {
     const { roomKey } = data;
