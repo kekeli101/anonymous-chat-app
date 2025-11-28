@@ -360,4 +360,17 @@ socket.on('error', (data) => {
 });
 
 // Initialize
-showPage(greetingPage);
+const urlParams = new URLSearchParams(window.location.search);
+const roomKeyFromUrl = urlParams.get('room');
+
+if (roomKeyFromUrl && /^\d{6}$/.test(roomKeyFromUrl)) {
+    // Remove the room parameter from the URL to prevent re-joining on refresh
+    history.replaceState(null, '', window.location.pathname);
+
+    // Pre-fill the join room input and show the join page
+    roomKeyInput.value = roomKeyFromUrl;
+    showPage(joinRoomPage);
+    joinSubmitBtn.click(); // Automatically attempt to join
+} else {
+    showPage(greetingPage);
+}
