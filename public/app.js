@@ -1,3 +1,5 @@
+document.addEventListener('DOMContentLoaded', () => {
+
 // Connect to Socket.IO server
 const socket = io({
   transports: ['websocket', 'polling']
@@ -239,20 +241,8 @@ copyRoomKeyBtn.addEventListener('click', () => {
             console.error('Could not copy text: ', err);
         });
 });
-// ...
 
-// Initialize (New logic added at the end of the file)
-const urlParams = new URLSearchParams(window.location.search);
-const roomKeyFromUrl = urlParams.get('room');
 
-if (roomKeyFromUrl && /^\d{6}$/.test(roomKeyFromUrl)) {
-    // Pre-fill the join room input and show the join page
-    roomKeyInput.value = roomKeyFromUrl;
-    showPage(joinRoomPage);
-    joinSubmitBtn.click(); // Automatically attempt to join
-} else {
-    showPage(greetingPage);
-}
 function sendMessage() {
     const message = messageInput.value.trim();
     
@@ -271,6 +261,24 @@ function sendMessage() {
             cancelReply();
         }
     }
+}
+
+
+
+// Initialize
+const urlParams = new URLSearchParams(window.location.search);
+const roomKeyFromUrl = urlParams.get('room');
+
+if (roomKeyFromUrl && /^\d{6}$/.test(roomKeyFromUrl)) {
+    // Remove the room parameter from the URL to prevent re-joining on refresh
+    history.replaceState(null, '', window.location.pathname);
+
+    // Pre-fill the join room input and show the join page
+    roomKeyInput.value = roomKeyFromUrl;
+    showPage(joinRoomPage);
+    joinSubmitBtn.click(); // Automatically attempt to join
+} else {
+    showPage(greetingPage);
 }
 
 // Socket.IO event handlers
@@ -407,18 +415,6 @@ socket.on('error', (data) => {
     }
 });
 
-// Initialize
-const urlParams = new URLSearchParams(window.location.search);
-const roomKeyFromUrl = urlParams.get('room');
+}); // End of DOMContentLoaded
 
-if (roomKeyFromUrl && /^\d{6}$/.test(roomKeyFromUrl)) {
-    // Remove the room parameter from the URL to prevent re-joining on refresh
-    history.replaceState(null, '', window.location.pathname);
 
-    // Pre-fill the join room input and show the join page
-    roomKeyInput.value = roomKeyFromUrl;
-    showPage(joinRoomPage);
-    joinSubmitBtn.click(); // Automatically attempt to join
-} else {
-    showPage(greetingPage);
-}
