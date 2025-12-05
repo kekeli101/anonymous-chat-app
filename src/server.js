@@ -117,6 +117,30 @@ io.on('connection', (socket) => {
     console.log(`User joined room: ${roomKey} as ${username} (${socket.id})`);
   });
   
+  // Change username
+  socket.on('changeUsername', (data) => {
+    const { newUsername } = data;
+    
+    // Find the room the user is in
+    for (const [roomKey, room] of activeRooms.entries()) {
+      if (room.users.has(socket.id)) {
+        const oldUsername = room.users.get(socket.id);
+        
+        // Update username
+        room.users.set(socket.id, newUsername);
+        
+        // Notify all users in the room
+        io.to(roomKey).emit('systemMessage', {
+          message: `${oldUsername} has changed their name to ${newUsername}`,
+          timestamp: new Date()
+        });
+        
+        console.log(`User in room ${roomKey} changed name from ${oldUsername} to ${newUsername}`);
+        return;
+      }
+    }
+  });
+
   // Send a message to the room
   socket.on('sendMessage', (data) => {
     const { roomKey, message, replyTo } = data;

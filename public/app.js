@@ -35,6 +35,7 @@ const replyMessage = document.getElementById('reply-message');
 const cancelReplyBtn = document.getElementById('cancel-reply');
 
 const typingIndicator = document.getElementById('typing-indicator');
+const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
 
 // App state
 let currentRoom = null;
@@ -129,8 +130,8 @@ function addMessage(messageObj, isOwnMessage = false) {
         this.classList.remove('swiping');
     });
     
-    // Scroll to bottom (auto-scroll disabled by user request)
-    // chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Auto-scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 function startReply(messageId) {
@@ -162,11 +163,29 @@ function addSystemMessage(message) {
     
     chatMessages.appendChild(messageElement);
     
-    // Scroll to bottom (auto-scroll disabled by user request)
-    // chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Auto-scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 // Event listeners
+
+usernameDisplay.addEventListener('blur', () => {
+    const newUsername = usernameDisplay.textContent.trim();
+    if (newUsername && newUsername !== currentUsername) {
+        socket.emit('changeUsername', { newUsername });
+        currentUsername = newUsername; // Optimistic update
+    } else {
+        // Revert if empty or unchanged
+        usernameDisplay.textContent = currentUsername;
+    }
+});
+
+usernameDisplay.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault(); // Prevent new line
+        usernameDisplay.blur(); // Trigger blur event to save
+    }
+});
 createRoomBtn.addEventListener('click', () => {
     socket.emit('createRoom');
 });
@@ -388,6 +407,10 @@ socket.on('userLeft', (data) => {
     userCountDisplay.textContent = data.userCount;
 });
 
+socket.on('systemMessage', (data) => {
+    addSystemMessage(data.message);
+});
+
 socket.on('roomClosed', (data) => {
     alert(data.message);
     showPage(greetingPage);
@@ -414,6 +437,24 @@ socket.on('error', (data) => {
         alert(data.message);
     }
 });
+
+// Scroll to bottom button logic
+scrollToBottomBtn.addEventListener('click', () => {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+});
+
+chatMessages.addEventListener('scroll', () => {
+    // Show button if user is not at the bottom
+    const isAtBottom = chatMessages.scrollHeight - chatMessages.clientHeight <= chatMessages.scrollTop + 1; // +1 for tolerance
+    if (isAtBottom) {
+        scrollToBottomBtn.style.display = 'none';
+    } else {
+        scrollToBottomBtn.style.display = 'block';
+    }
+});
+
+// Hide button initially
+scrollToBottomBtn.style.display = 'none';
 
 }); // End of DOMContentLoaded
 

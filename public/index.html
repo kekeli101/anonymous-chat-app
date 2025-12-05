@@ -43,7 +43,7 @@
             <div class="chat-header">
                 <div class="room-info">
                     <h2>Room: <span id="room-key-display"></span></h2>
-                    <p>You are: <span id="username-display"></span></p>
+                    <p>You are: <span id="username-display" contenteditable="true" title="Click to edit your username"></span></p>
                 </div>
                 <div class="user-count">
                     <p>Users in room: <span id="user-count-display">1</span></p>
@@ -68,6 +68,7 @@
                 </div>
             </div>
             <div class="typing-indicator" id="typing-indicator"></div>
+            <button id="scroll-to-bottom-btn" class="btn-icon scroll-to-bottom-btn"><i class="fas fa-arrow-down"></i></button>
             <div class="chat-input">
                 <input type="text" id="message-input" placeholder="Type your message...">
                 <button id="send-message-btn"><i class="fas fa-paper-plane"></i></button>

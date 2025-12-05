@@ -10,6 +10,7 @@ body {
     background-color: #f5f5f5;
     color: #333;
     line-height: 1.6;
+    overflow-x: hidden; /* Prevent horizontal scrolling */
 }
 
 .container {
@@ -138,6 +139,7 @@ input[type="text"]:focus {
     flex-direction: column;
     height: 100vh;
     max-width: 800px;
+    width: 100%; /* Ensure it takes full width on mobile */
     margin: 0 auto;
     background-color: white;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
@@ -342,6 +344,10 @@ input[type="text"]:focus {
 
 /* Responsive Styles */
 @media (max-width: 768px) {
+    .chat-container {
+        max-width: 100%;
+        box-shadow: none;
+    }
     .container {
         padding: 1rem;
     }
@@ -380,3 +386,30 @@ input[type="text"]:focus {
 }
   
 
+
+/* Scroll to Bottom Button */
+.scroll-to-bottom-btn {
+    position: absolute;
+    bottom: 80px; /* Above the chat input */
+    right: 20px;
+    z-index: 10;
+    background-color: #3498db;
+    color: white;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    display: none; /* Hidden by default, controlled by JS */
+    transition: opacity 0.3s;
+}
+
+.scroll-to-bottom-btn:hover {
+    background-color: #2980b9;
+}
+
+@media (max-width: 768px) {
+    .scroll-to-bottom-btn {
+        right: 10px;
+        bottom: 70px;
+    }
+}
