@@ -131,7 +131,7 @@ function addMessage(messageObj, isOwnMessage = false) {
     });
     
     // Auto-scroll to bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
 }
 
 function startReply(messageId) {
@@ -164,7 +164,7 @@ function addSystemMessage(message) {
     chatMessages.appendChild(messageElement);
     
     // Auto-scroll to bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
 }
 
 // Event listeners
@@ -440,7 +440,7 @@ socket.on('error', (data) => {
 
 // Scroll to bottom button logic
 scrollToBottomBtn.addEventListener('click', () => {
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
 });
 
 chatMessages.addEventListener('scroll', () => {
