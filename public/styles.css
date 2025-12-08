@@ -414,3 +414,34 @@ input[type="text"]:focus {
         bottom: 70px;
     }
 }
+
+/* Username Edit Icon Styling */
+#username-wrapper {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 2px 0;
+    border-bottom: 1px dashed transparent;
+    transition: border-bottom 0.2s ease;
+}
+
+#username-wrapper:hover {
+    border-bottom: 1px dashed #ccc;
+}
+
+#edit-icon {
+    margin-left: 5px;
+    font-size: 0.8em;
+    color: #ccc;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+#username-wrapper:hover #edit-icon {
+    opacity: 1;
+}
+
+#username-display:focus + #edit-icon {
+    opacity: 1;
+    color: #3498db; /* Highlight color when focused/editing */
+}
