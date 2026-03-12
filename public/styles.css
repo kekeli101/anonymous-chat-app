@@ -433,12 +433,8 @@ input[type="text"]:focus {
     margin-left: 5px;
     font-size: 0.8em;
     color: #ccc;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-#username-wrapper:hover #edit-icon {
-    opacity: 1;
+    opacity: 1; /* Always visible */
+    transition: color 0.2s ease;
 }
 
 #username-display:focus + #edit-icon {

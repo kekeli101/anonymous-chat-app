@@ -26,6 +26,18 @@ const activeRooms = new Map();
 // Get port from environment variable or use default
 const PORT = process.env.PORT || 3000;
 
+// Self-pinging logic to keep the app active on Render
+const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
+if (RENDER_EXTERNAL_URL) {
+  setInterval(() => {
+    http.get(RENDER_EXTERNAL_URL, (res) => {
+      console.log(`Self-ping status: ${res.statusCode}`);
+    }).on('error', (err) => {
+      console.error(`Self-ping error: ${err.message}`);
+    });
+  }, 14 * 60 * 1000); // Ping every 14 minutes (Render's free tier sleeps after 15 mins of inactivity)
+}
+
 // Generate a random 6-digit room key
 function generateRoomKey() {
   let key;
