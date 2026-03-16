@@ -341,7 +341,7 @@ socket.on('roomJoined', (data) => {
     if (data.messages && data.messages.length > 0) {
         // Clear existing messages
         while (chatMessages.firstChild) {
-            if (chatMessages.firstChild.classList && chatMessages.firstChild.classList.contains('welcome-message')) {
+            if (chatMessages.firstChild.classList && chatMessages.firstChild.classList.contains('system-message')) {
                 break;
             }
             chatMessages.removeChild(chatMessages.firstChild);
@@ -423,7 +423,7 @@ socket.on('roomClosed', (data) => {
     
     // Clear chat messages
     while (chatMessages.firstChild) {
-        if (chatMessages.firstChild.classList && chatMessages.firstChild.classList.contains('welcome-message')) {
+        if (chatMessages.firstChild.classList && chatMessages.firstChild.classList.contains('system-message')) {
             break;
         }
         chatMessages.removeChild(chatMessages.firstChild);

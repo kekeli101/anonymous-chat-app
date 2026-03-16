@@ -53,9 +53,11 @@
                 </div>
             </div>
             <div class="chat-messages" id="chat-messages">
-                <div class="welcome-message">
-                    <p>Welcome to the chat room! You can now start chatting anonymously.</p>
-                    <p class="room-key-info">Room Key: <span id="room-key-info"></span> <button id="copy-room-key" class="btn-icon" title="Copy Invite Link"><i class="fas fa-link"></i></button></p>
+                <div class="system-message">
+                    Welcome to the chat room! You can now start chatting anonymously.
+                </div>
+                <div class="system-message">
+                    Room Key: <span id="room-key-info"></span> <button id="copy-room-key" class="btn-icon" title="Copy Invite Link"><i class="fas fa-link"></i></button>
                 </div>
             </div>
             <div class="reply-container" id="reply-container">
@@ -69,9 +71,11 @@
             </div>
             <div class="typing-indicator" id="typing-indicator"></div>
             <button id="scroll-to-bottom-btn" class="btn-icon scroll-to-bottom-btn"><i class="fas fa-arrow-down"></i></button>
-            <div class="chat-input">
-                <input type="text" id="message-input" placeholder="Type your message...">
-                <button id="send-message-btn"><i class="fas fa-paper-plane"></i></button>
+            <div class="chat-input-container">
+                <div class="chat-input">
+                    <input type="text" id="message-input" placeholder="Type your message...">
+                </div>
+                <button id="send-message-btn" class="send-btn"><i class="fas fa-paper-plane"></i></button>
             </div>
         </div>
     </div>
