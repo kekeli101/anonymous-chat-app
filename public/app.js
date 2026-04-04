@@ -1,5 +1,3 @@
-document.addEventListener('DOMContentLoaded', () => {
-
 // Connect to Socket.IO server
 const socket = io({
   transports: ['websocket', 'polling']
@@ -116,10 +114,12 @@ function addMessage(messageObj, isOwnMessage = false) {
     chatMessages.appendChild(messageElement);
     
     // Set up Hammer.js for swipe gestures
-    const hammer = new Hammer(messageElement);
-    hammer.on('swiperight', function(e) {
-        startReply(id);
-    });
+    if (typeof Hammer !== 'undefined') {
+        const hammer = new Hammer(messageElement);
+        hammer.on('swiperight', function(e) {
+            startReply(id);
+        });
+    }
     
     // Also detect touch start/end for visual feedback
     messageElement.addEventListener('touchstart', function() {
@@ -167,8 +167,42 @@ function addSystemMessage(message) {
     chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
 }
 
-// Event listeners
+function sendMessage() {
+    const message = messageInput.value.trim();
+    
+    if (message && currentRoom) {
+        socket.emit('sendMessage', {
+            roomKey: currentRoom,
+            message,
+            replyTo: replyingTo
+        });
+        
+        messageInput.value = '';
+        messageInput.focus();
+        
+        // Clear reply state
+        if (replyingTo) {
+            cancelReply();
+        }
+    }
+}
 
+function updateTypingIndicator() {
+    const users = Array.from(typingUsers);
+    let text = '';
+
+    if (users.length === 1) {
+        text = `${users[0]} is typing...`;
+    } else if (users.length === 2) {
+        text = `${users[0]} and ${users[1]} are typing...`;
+    } else if (users.length > 2) {
+        text = `${users.length} people are typing...`;
+    }
+
+    typingIndicator.textContent = text;
+}
+
+// Event listeners
 usernameDisplay.addEventListener('blur', () => {
     const newUsername = usernameDisplay.textContent.trim();
     if (newUsername && newUsername !== currentUsername) {
@@ -186,6 +220,7 @@ usernameDisplay.addEventListener('keypress', (e) => {
         usernameDisplay.blur(); // Trigger blur event to save
     }
 });
+
 createRoomBtn.addEventListener('click', () => {
     socket.emit('createRoom');
 });
@@ -261,44 +296,20 @@ copyRoomKeyBtn.addEventListener('click', () => {
         });
 });
 
+// Scroll to bottom button logic
+scrollToBottomBtn.addEventListener('click', () => {
+    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+});
 
-function sendMessage() {
-    const message = messageInput.value.trim();
-    
-    if (message && currentRoom) {
-        socket.emit('sendMessage', {
-            roomKey: currentRoom,
-            message,
-            replyTo: replyingTo
-        });
-        
-        messageInput.value = '';
-        messageInput.focus();
-        
-        // Clear reply state
-        if (replyingTo) {
-            cancelReply();
-        }
+chatMessages.addEventListener('scroll', () => {
+    // Show button if user is not at the bottom
+    const isAtBottom = chatMessages.scrollHeight - chatMessages.clientHeight <= chatMessages.scrollTop + 1; // +1 for tolerance
+    if (isAtBottom) {
+        scrollToBottomBtn.classList.remove('visible');
+    } else {
+        scrollToBottomBtn.classList.add('visible');
     }
-}
-
-
-
-// Initialize
-const urlParams = new URLSearchParams(window.location.search);
-const roomKeyFromUrl = urlParams.get('room');
-
-if (roomKeyFromUrl && /^\d{6}$/.test(roomKeyFromUrl)) {
-    // Remove the room parameter from the URL to prevent re-joining on refresh
-    history.replaceState(null, '', window.location.pathname);
-
-    // Pre-fill the join room input and show the join page
-    roomKeyInput.value = roomKeyFromUrl;
-    showPage(joinRoomPage);
-    joinSubmitBtn.click(); // Automatically attempt to join
-} else {
-    showPage(greetingPage);
-}
+});
 
 // Socket.IO event handlers
 socket.on('roomCreated', (data) => {
@@ -382,21 +393,6 @@ socket.on('userStopTyping', (data) => {
     updateTypingIndicator();
 });
 
-function updateTypingIndicator() {
-    const users = Array.from(typingUsers);
-    let text = '';
-
-    if (users.length === 1) {
-        text = `${users[0]} is typing...`;
-    } else if (users.length === 2) {
-        text = `${users[0]} and ${users[1]} are typing...`;
-    } else if (users.length > 2) {
-        text = `${users.length} people are typing...`;
-    }
-
-    typingIndicator.textContent = text;
-}
-
 socket.on('userJoined', (data) => {
     addSystemMessage(`${data.username} has joined the room`);
     userCountDisplay.textContent = data.userCount;
@@ -438,24 +434,18 @@ socket.on('error', (data) => {
     }
 });
 
-// Scroll to bottom button logic
-scrollToBottomBtn.addEventListener('click', () => {
-    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
-});
+// Initialize
+const urlParams = new URLSearchParams(window.location.search);
+const roomKeyFromUrl = urlParams.get('room');
 
-chatMessages.addEventListener('scroll', () => {
-    // Show button if user is not at the bottom
-    const isAtBottom = chatMessages.scrollHeight - chatMessages.clientHeight <= chatMessages.scrollTop + 1; // +1 for tolerance
-    if (isAtBottom) {
-        scrollToBottomBtn.style.display = 'none';
-    } else {
-        scrollToBottomBtn.style.display = 'block';
-    }
-});
+if (roomKeyFromUrl && /^\d{6}$/.test(roomKeyFromUrl)) {
+    // Remove the room parameter from the URL to prevent re-joining on refresh
+    history.replaceState(null, '', window.location.pathname);
 
-// Hide button initially
-scrollToBottomBtn.style.display = 'none';
-
-}); // End of DOMContentLoaded
-
-
+    // Pre-fill the join room input and show the join page
+    roomKeyInput.value = roomKeyFromUrl;
+    showPage(joinRoomPage);
+    joinSubmitBtn.click(); // Automatically attempt to join
+} else {
+    showPage(greetingPage);
+}
