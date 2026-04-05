@@ -49,15 +49,22 @@ function generateRoomKey() {
 
 // Generate a random username
 function generateUsername() {
-  const adjectives = ['Red', 'Blue', 'Green', 'Yellow', 'Purple', 'Orange', 'Pink', 'Black', 'White', 'Gray'];
-  const animals = ['Lion', 'Tiger', 'Bear', 'Wolf', 'Fox', 'Eagle', 'Hawk', 'Dolphin', 'Shark', 'Elephant'];
-  const objects = ['Apple', 'Banana', 'Cherry', 'Diamond', 'Emerald', 'Fire', 'Galaxy', 'Hurricane', 'Ice', 'Jungle'];
-  
+  const adjectives = [
+    'Silent', 'Cosmic', 'Swift', 'Calm', 'Bright', 'Hidden', 'Wandering',
+    'Ancient', 'Clever', 'Misty', 'Bold', 'Gentle', 'Wild', 'Quiet', 'Vast'
+  ];
+
+  const nouns = [
+    'Panda', 'Comet', 'River', 'Forest', 'Falcon', 'Drifter', 'Nomad',
+    'Voyager', 'Sage', 'Shadow', 'Ember', 'Horizon', 'Tide', 'Cipher', 'Echo'
+  ];
+
   const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-  const randomAnimal = animals[Math.floor(Math.random() * animals.length)];
-  const randomObject = objects[Math.floor(Math.random() * objects.length)];
-  
-  return `${randomAdjective}-${randomAnimal}-${randomObject}`;
+  const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+  const randomNum = Math.floor(Math.random() * 1000);
+
+  return `${randomAdjective}${randomNoun}${randomNum}`;
+}
 }
 
 // Socket.IO connection handler
