@@ -2,6 +2,53 @@
    TELEGRAM-INSPIRED CHAT APP - MODERN UI
    ============================================ */
 
+/* Theme Variables */
+:root {
+    --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    --text-color: #333;
+    --heading-color: #0088cc;
+    --subtext-color: #65676b;
+    --container-bg: linear-gradient(180deg, #ffffff 0%, #f5f7fa 100%);
+    --header-bg: linear-gradient(135deg, #0088cc 0%, #0073b1 100%);
+    --header-text: #ffffff;
+    --message-own-bg: linear-gradient(135deg, #0088cc 0%, #0073b1 100%);
+    --message-own-text: #ffffff;
+    --message-other-bg: #ffffff;
+    --message-other-text: #333;
+    --input-bg: #f5f5f5;
+    --input-border: #e0e0e0;
+    --input-text: #333;
+    --system-msg-bg: rgba(0, 136, 204, 0.08);
+    --system-msg-text: #0088cc;
+    --reply-bg: #f0f8ff;
+    --reply-border: #0088cc;
+    --card-bg: #ffffff;
+    --shadow-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] {
+    --bg-gradient: linear-gradient(135deg, #1a1a1a 0%, #2d3436 100%);
+    --text-color: #e0e0e0;
+    --heading-color: #4db8ff;
+    --subtext-color: #b0b0b0;
+    --container-bg: #1e1e1e;
+    --header-bg: #2d2d2d;
+    --header-text: #ffffff;
+    --message-own-bg: linear-gradient(135deg, #0088cc 0%, #0073b1 100%);
+    --message-own-text: #ffffff;
+    --message-other-bg: #2d2d2d;
+    --message-other-text: #e0e0e0;
+    --input-bg: #2d2d2d;
+    --input-border: #404040;
+    --input-text: #e0e0e0;
+    --system-msg-bg: rgba(255, 255, 255, 0.05);
+    --system-msg-text: #4db8ff;
+    --reply-bg: #2d2d2d;
+    --reply-border: #4db8ff;
+    --card-bg: #2d2d2d;
+    --shadow-color: rgba(0, 0, 0, 0.3);
+}
+
 /* Global Styles */
 * {
     margin: 0;
@@ -13,11 +60,12 @@
 html, body {
     width: 100%;
     height: 100%;
+    transition: background-color 0.3s, color 0.3s;
 }
 
 body {
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    color: #333;
+    background: var(--bg-gradient);
+    color: var(--text-color);
     line-height: 1.5;
     overflow-x: hidden;
 }
@@ -41,14 +89,14 @@ body {
 h1 {
     font-size: 3rem;
     margin-bottom: 1rem;
-    color: #0088cc;
+    color: var(--heading-color);
     font-weight: 700;
     letter-spacing: -0.5px;
 }
 
 p {
     margin-bottom: 2rem;
-    color: #65676b;
+    color: var(--subtext-color);
     font-size: 1.1rem;
     font-weight: 400;
 }
@@ -67,7 +115,7 @@ p {
     margin: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.3px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 8px var(--shadow-color);
 }
 
 .btn:active {
@@ -85,13 +133,13 @@ p {
 }
 
 .secondary {
-    background-color: #ffffff;
-    color: #0088cc;
-    border: 2px solid #0088cc;
+    background-color: var(--card-bg);
+    color: var(--heading-color);
+    border: 2px solid var(--heading-color);
 }
 
 .secondary:hover {
-    background-color: #f0f8ff;
+    background-color: rgba(0, 136, 204, 0.05);
     box-shadow: 0 4px 16px rgba(0, 136, 204, 0.15);
 }
 
@@ -123,16 +171,17 @@ p {
 input[type="text"] {
     width: 100%;
     padding: 14px 18px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid var(--input-border);
     border-radius: 24px;
     font-size: 1rem;
     outline: none;
     transition: all 0.3s;
-    background-color: #ffffff;
+    background-color: var(--input-bg);
+    color: var(--input-text);
 }
 
 input[type="text"]:focus {
-    border-color: #0088cc;
+    border-color: var(--heading-color);
     box-shadow: 0 0 0 3px rgba(0, 136, 204, 0.1);
 }
 
@@ -167,7 +216,7 @@ input[type="text"]:focus {
     flex-direction: column;
     height: 100vh;
     width: 100%;
-    background: linear-gradient(180deg, #ffffff 0%, #f5f7fa 100%);
+    background: var(--container-bg);
     position: relative;
 }
 
@@ -177,9 +226,9 @@ input[type="text"]:focus {
     justify-content: space-between;
     align-items: center;
     padding: 1rem 1.5rem;
-    background: linear-gradient(135deg, #0088cc 0%, #0073b1 100%);
-    color: white;
-    box-shadow: 0 4px 12px rgba(0, 136, 204, 0.15);
+    background: var(--header-bg);
+    color: var(--header-text);
+    box-shadow: 0 4px 12px var(--shadow-color);
     z-index: 10;
 }
 
@@ -198,6 +247,25 @@ input[type="text"]:focus {
     margin: 0;
     color: rgba(255, 255, 255, 0.85);
     font-weight: 400;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.theme-toggle {
+    color: white;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: background-color 0.3s;
+}
+
+.theme-toggle:hover {
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 .user-count {
@@ -258,7 +326,7 @@ input[type="text"]:focus {
     font-size: 0.95rem;
     animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     word-wrap: break-word;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 2px var(--shadow-color);
 }
 
 @keyframes slideIn {
@@ -273,19 +341,19 @@ input[type="text"]:focus {
 }
 
 .message.own-message {
-    background: linear-gradient(135deg, #0088cc 0%, #0073b1 100%);
-    color: white;
+    background: var(--message-own-bg);
+    color: var(--message-own-text);
     align-self: flex-end;
     border-bottom-right-radius: 4px;
     box-shadow: 0 2px 4px rgba(0, 136, 204, 0.2);
 }
 
 .message.other-message {
-    background-color: #ffffff;
-    color: #333;
+    background-color: var(--message-other-bg);
+    color: var(--message-other-text);
     align-self: flex-start;
     border-bottom-left-radius: 4px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 3px var(--shadow-color);
 }
 
 .message .username {
@@ -300,7 +368,7 @@ input[type="text"]:focus {
 }
 
 .message.other-message .username {
-    color: #0088cc;
+    color: var(--heading-color);
 }
 
 .message .content {
@@ -326,11 +394,11 @@ input[type="text"]:focus {
 /* System Messages */
 .system-message {
     align-self: center;
-    background-color: rgba(0, 136, 204, 0.08);
+    background-color: var(--system-msg-bg);
     padding: 8px 16px;
     border-radius: 16px;
     font-size: 0.85rem;
-    color: #0088cc;
+    color: var(--system-msg-text);
     margin: 12px 0;
     box-shadow: none;
     font-weight: 500;
@@ -342,7 +410,7 @@ input[type="text"]:focus {
 
 .reply-quote {
     background-color: rgba(0, 0, 0, 0.05);
-    border-left: 3px solid #0088cc;
+    border-left: 3px solid var(--heading-color);
     padding: 6px 10px;
     margin-bottom: 6px;
     border-radius: 4px;
@@ -366,15 +434,15 @@ input[type="text"]:focus {
 }
 
 .message.other-message .reply-quote-username {
-    color: #0088cc;
+    color: var(--heading-color);
 }
 
 /* Reply Container */
 .reply-container {
     display: none;
-    background-color: #f0f8ff;
+    background-color: var(--reply-bg);
     padding: 12px 16px;
-    border-left: 3px solid #0088cc;
+    border-left: 3px solid var(--reply-border);
     align-items: center;
     gap: 12px;
 }
@@ -397,14 +465,14 @@ input[type="text"]:focus {
 .reply-username {
     font-weight: 600;
     font-size: 0.85rem;
-    color: #0088cc;
+    color: var(--heading-color);
     display: block;
     margin-bottom: 2px;
 }
 
 #reply-message {
     font-size: 0.9rem;
-    color: #333;
+    color: var(--text-color);
 }
 
 /* ============================================
@@ -426,28 +494,28 @@ input[type="text"]:focus {
    ============================================ */
 
 .chat-input-container {
-    background-color: #ffffff;
+    background-color: var(--card-bg);
     padding: 12px 16px;
     display: flex;
     align-items: flex-end;
     gap: 10px;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--input-border);
 }
 
 .chat-input {
     flex: 1;
-    background-color: #f5f5f5;
+    background-color: var(--input-bg);
     border-radius: 24px;
     padding: 10px 16px;
     display: flex;
     align-items: center;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--input-border);
     transition: all 0.3s;
 }
 
 .chat-input:focus-within {
-    border-color: #0088cc;
-    background-color: #ffffff;
+    border-color: var(--heading-color);
+    background-color: var(--card-bg);
     box-shadow: 0 0 0 3px rgba(0, 136, 204, 0.1);
 }
 
@@ -458,7 +526,7 @@ input[type="text"]:focus {
     font-size: 1rem;
     width: 100%;
     background: transparent;
-    color: #333;
+    color: var(--input-text);
 }
 
 .chat-input input::placeholder {
@@ -501,53 +569,32 @@ input[type="text"]:focus {
 .btn-icon {
     background: none;
     border: none;
-    color: #0088cc;
     cursor: pointer;
-    font-size: 1.2rem;
-    padding: 8px;
+    color: var(--heading-color);
+    font-size: 1.1rem;
+    transition: all 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
-    transition: all 0.3s;
 }
 
 .btn-icon:hover {
-    background-color: rgba(0, 136, 204, 0.1);
     color: #0073b1;
+    transform: scale(1.1);
 }
 
-.btn-icon:active {
-    transform: scale(0.9);
-}
-
-/* Scroll to Bottom Button */
 .scroll-to-bottom-btn {
     position: absolute;
-    bottom: 70px;
+    bottom: 80px;
     right: 20px;
-    z-index: 10;
-    background-color: white;
-    color: #0088cc;
+    background-color: var(--card-bg);
+    color: var(--heading-color);
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
-    width: 44px;
-    height: 44px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 4px 12px var(--shadow-color);
     display: none;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    border: none;
-    transition: all 0.3s;
-}
-
-.scroll-to-bottom-btn.visible {
-    display: flex;
-}
-
-.scroll-to-bottom-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 5;
 }
 
 /* ============================================
@@ -558,56 +605,24 @@ input[type="text"]:focus {
     display: inline-flex;
     align-items: center;
     cursor: pointer;
-    transition: all 0.2s;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
 }
 
 #username-wrapper:hover {
-    opacity: 0.8;
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 #username-display {
     outline: none;
-    padding: 2px 4px;
-    border-radius: 4px;
-    transition: all 0.2s;
-}
-
-#username-display:focus {
-    background-color: rgba(255, 255, 255, 0.2);
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.5);
+    margin-right: 6px;
 }
 
 #edit-icon {
-    margin-left: 6px;
-    font-size: 0.75rem;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-}
-
-#username-wrapper:hover #edit-icon {
-    opacity: 1;
-}
-
-/* ============================================
-   SWIPE HINT
-   ============================================ */
-
-.swipe-hint {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    opacity: 0;
-    transition: opacity 0.3s;
-    color: rgba(0, 0, 0, 0.2);
-    font-size: 0.9rem;
-}
-
-.message:hover .swipe-hint {
-    opacity: 1;
-}
-
-.message.swiping {
-    opacity: 0.7;
+    font-size: 0.8rem;
+    opacity: 0.8;
 }
 
 /* ============================================
@@ -615,61 +630,12 @@ input[type="text"]:focus {
    ============================================ */
 
 @media (max-width: 768px) {
-    h1 {
-        font-size: 2.2rem;
-    }
-
-    p {
-        font-size: 1rem;
-    }
-
-    .message {
-        max-width: 85%;
-    }
-
-    .chat-header {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
-
-    .room-info {
-        width: 100%;
-    }
-
-    .user-count,
-    .admin-controls {
-        margin-left: 0;
-    }
-
-    .chat-input-container {
-        padding: 10px 12px;
-    }
-
-    .send-btn {
-        width: 38px;
-        height: 38px;
-        font-size: 1rem;
-    }
-}
-
-@media (max-width: 480px) {
     .container {
-        padding: 1rem;
+        padding: 1.5rem;
     }
 
     h1 {
-        font-size: 1.8rem;
-    }
-
-    .btn {
-        padding: 10px 20px;
-        font-size: 0.95rem;
-        margin: 0.5rem 0.25rem;
-    }
-
-    .message {
-        max-width: 90%;
-        font-size: 0.9rem;
+        font-size: 2.5rem;
     }
 
     .chat-header {
@@ -677,24 +643,25 @@ input[type="text"]:focus {
     }
 
     .room-info h2 {
-        font-size: 1rem;
+        font-size: 1.1rem;
     }
 
-    .room-info p {
-        font-size: 0.8rem;
+    .message {
+        max-width: 85%;
     }
 
-    .user-count {
-        padding: 0.4rem 0.8rem;
-        font-size: 0.8rem;
+    .chat-input-container {
+        padding: 10px;
     }
 }
 
-/* ============================================
-   SCROLLBAR STYLING (Firefox)
-   ============================================ */
+@media (max-width: 480px) {
+    .message {
+        max-width: 90%;
+    }
 
-* {
-    scrollbar-color: #ccc transparent;
-    scrollbar-width: thin;
+    .btn {
+        width: 100%;
+        margin: 0.5rem 0;
+    }
 }

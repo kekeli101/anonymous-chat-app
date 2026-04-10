@@ -34,6 +34,7 @@ const cancelReplyBtn = document.getElementById('cancel-reply');
 
 const typingIndicator = document.getElementById('typing-indicator');
 const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
+const themeToggle = document.getElementById('theme-toggle');
 
 // App state
 let currentRoom = null;
@@ -201,6 +202,41 @@ function updateTypingIndicator() {
 
     typingIndicator.textContent = text;
 }
+
+// Theme Logic
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeIcon(newTheme);
+}
+
+function updateThemeIcon(theme) {
+    if (!themeToggle) return;
+    const icon = themeToggle.querySelector('i');
+    if (theme === 'dark') {
+        icon.classList.remove('fa-moon');
+        icon.classList.add('fa-sun');
+    } else {
+        icon.classList.remove('fa-sun');
+        icon.classList.add('fa-moon');
+    }
+}
+
+if (themeToggle) {
+    themeToggle.addEventListener('click', toggleTheme);
+}
+
+// Initialize theme
+initTheme();
 
 // Event listeners
 usernameDisplay.addEventListener('blur', () => {
