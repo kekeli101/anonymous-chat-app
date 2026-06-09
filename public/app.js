@@ -44,6 +44,17 @@ let replyingTo = null;
 let messageMap = new Map(); // Store messages by ID for reply functionality
 
 // Helper functions
+function loadAdsInPage(page) {
+    page.querySelectorAll('ins.adsbygoogle:not([data-ad-loaded])').forEach((ad) => {
+        ad.setAttribute('data-ad-loaded', 'true');
+        try {
+            (adsbygoogle = window.adsbygoogle || []).push({});
+        } catch (e) {
+            console.warn('AdSense load skipped:', e);
+        }
+    });
+}
+
 function showPage(page) {
     // Hide all pages
     greetingPage.classList.remove('active');
@@ -52,6 +63,7 @@ function showPage(page) {
     
     // Show the selected page
     page.classList.add('active');
+    requestAnimationFrame(() => loadAdsInPage(page));
 }
 
 function formatTimestamp(timestamp) {

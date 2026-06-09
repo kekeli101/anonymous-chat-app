@@ -84,6 +84,38 @@ body {
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    gap: 1.5rem;
+}
+
+/* ============================================
+   AD CONTAINERS
+   ============================================ */
+
+.ad-container {
+    width: 100%;
+    max-width: 728px;
+    overflow: hidden;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.ad-container--landing {
+    margin-top: auto;
+    max-height: 120px;
+}
+
+.ad-container--chat {
+    max-height: 90px;
+    background-color: var(--card-bg);
+    border-top: 1px solid var(--input-border);
+    padding: 4px 8px;
+}
+
+.ad-container ins.adsbygoogle {
+    display: block;
+    width: 100%;
 }
 
 h1 {
@@ -585,7 +617,7 @@ input[type="text"]:focus {
 
 .scroll-to-bottom-btn {
     position: absolute;
-    bottom: 80px;
+    bottom: 150px;
     right: 20px;
     background-color: var(--card-bg);
     color: var(--heading-color);
