@@ -62,6 +62,7 @@ if (ROOM_INACTIVITY_LIMIT_MS) {
   setInterval(() => {
     const now = Date.now();
     for (const [roomKey, room] of activeRooms.entries()) {
+      if (room.type === 'public') continue;
       if (now - new Date(room.lastActivity).getTime() > ROOM_INACTIVITY_LIMIT_MS) {
         io.to(roomKey).emit('roomClosed', { message: 'Room closed due to long inactivity' });
         const wasPublic = room.type === 'public';
@@ -135,7 +136,10 @@ function removeUserFromRoom(socket, roomKey, room, leaveSocket = true) {
   }
 
   ensureRoomHasAdmin(roomKey, room);
-  deleteRoomIfEmpty(roomKey, room);
+  const deleted = deleteRoomIfEmpty(roomKey, room);
+  if (!deleted && room.type === 'public') {
+    broadcastPublicRooms();
+  }
   console.log(`User left ${roomKey}: ${username} (${socket.id})`);
 }
 
@@ -166,10 +170,9 @@ function ensureRoomHasAdmin(roomKey, room) {
 
 function deleteRoomIfEmpty(roomKey, room) {
   if (room.users.size > 0) return false;
+  if (room.type === 'public') return false;
 
-  const wasPublic = room.type === 'public';
   activeRooms.delete(roomKey);
-  if (wasPublic) broadcastPublicRooms();
   console.log(`Room deleted (empty): ${roomKey}`);
   return true;
 }
@@ -295,6 +298,10 @@ io.on('connection', (socket) => {
     });
 
     emitUserList(roomKey, room);
+
+    if (room.type === 'public') {
+      broadcastPublicRooms();
+    }
 
     console.log(`User joined ${room.type} room ${roomKey} as ${username} (${socket.id})`);
   });
@@ -445,7 +452,10 @@ io.on('connection', (socket) => {
     });
     emitUserList(roomKey, room);
     ensureRoomHasAdmin(roomKey, room);
-    deleteRoomIfEmpty(roomKey, room);
+    const deleted = deleteRoomIfEmpty(roomKey, room);
+    if (!deleted && room.type === 'public') {
+      broadcastPublicRooms();
+    }
     console.log(`User ${targetUsername} removed from ${roomKey}`);
   });
 
@@ -460,6 +470,10 @@ io.on('connection', (socket) => {
     }
     if (!isRoomAdmin(room, socket.id)) {
       socket.emit('error', { message: 'Only a room admin can delete this room' });
+      return;
+    }
+    if (room.type === 'public') {
+      socket.emit('error', { message: 'Public rooms cannot be deleted' });
       return;
     }
     if (room.users.size > 1) {

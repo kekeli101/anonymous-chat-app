@@ -282,7 +282,8 @@ const socket = io({
   }
   
   function updateAdminUi() {
-    adminControls.style.display = isAdmin ? 'flex' : 'none';
+    const showDelete = isAdmin && currentType !== 'public';
+    adminControls.style.display = showDelete ? 'flex' : 'none';
     if (adminKeyBtn) adminKeyBtn.style.display = isAdmin ? 'none' : 'flex';
     if (deleteRoomBtn) {
       const count = parseInt(userCountDisplay.textContent, 10) || roomUsers.length || 1;
@@ -337,7 +338,7 @@ const socket = io({
     } else {
       html += `<div><i class="fas fa-globe"></i> Public room — anyone with the link can join.</div>`;
       if (currentDeleteCode) {
-        html += `<div class="admin-key-warning"><i class="fas fa-shield-halved"></i> Save your 6-digit delete code to unlock admin controls. The room is removed once everyone has left.</div>` +
+        html += `<div class="admin-key-warning"><i class="fas fa-shield-halved"></i> Save your 6-digit delete code to unlock admin controls (remove users). Public rooms stay open for anyone to join.</div>` +
           `<div><i class="fas fa-shield-halved"></i> Delete code: ` +
           `<code>${currentDeleteCode}</code> ` +
           `<button class="btn-icon copy-btn" data-copy="${currentDeleteCode}" title="Copy delete code"><i class="fas fa-copy"></i></button></div>`;
@@ -624,7 +625,7 @@ const socket = io({
   });
 
   deleteRoomBtn.addEventListener('click', () => {
-    if (!currentRoom || !isAdmin) return;
+    if (!currentRoom || !isAdmin || currentType === 'public') return;
     const count = parseInt(userCountDisplay.textContent, 10) || roomUsers.length;
     if (count > 1) {
       showToast('This room can only be deleted when no one else is in it.', 'error');
@@ -754,7 +755,7 @@ const socket = io({
         roomCreatedModalTitle.innerHTML = '<i class="fas fa-check-circle"></i> Room created!';
       }
       if (roomCreatedModalText) {
-        roomCreatedModalText.innerHTML = 'Save this <strong>6-digit delete PIN</strong> to unlock admin controls later. The room is removed once everyone has left.';
+        roomCreatedModalText.innerHTML = 'Save this <strong>6-digit delete PIN</strong> to unlock admin controls later. This public room stays open even when empty.';
       }
       if (copyCreatedPinBtn) {
         copyCreatedPinBtn.innerHTML = '<i class="fas fa-copy"></i> Copy PIN';
