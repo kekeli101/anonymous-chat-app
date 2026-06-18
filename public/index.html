@@ -37,7 +37,7 @@
 
             <div class="section-card">
                 <h2 class="section-title"><i class="fas fa-lock"></i> Private room</h2>
-                <p class="hint-text">Only people with your 6-digit key can join a private room.</p>
+                <p class="hint-text">Share your 6-digit key so others can join. You start as admin; the room is removed once everyone has left.</p>
                 <div class="button-group create-options">
                     <button id="create-private-btn" class="btn primary">
                         <i class="fas fa-lock"></i> Create Private Room
@@ -210,11 +210,11 @@
     <div id="room-created-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
         <div class="modal-card">
             <h2><i class="fas fa-check-circle"></i> Room created!</h2>
-            <p class="modal-text">Save this <strong>6-digit delete PIN</strong>. You will need it to delete the room later. We also saved it in your browser.</p>
+            <p class="modal-text" id="room-created-modal-text">Save this code before entering the room.</p>
             <div class="pin-display" id="created-pin-display">000000</div>
-            <p class="modal-subtext">Room: <span id="created-room-name-label"></span></p>
+            <p class="modal-subtext" id="room-created-modal-subtext">Room: <span id="created-room-name-label"></span></p>
             <div class="modal-actions">
-                <button type="button" class="btn secondary" id="copy-created-pin-btn"><i class="fas fa-copy"></i> Copy PIN</button>
+                <button type="button" class="btn secondary" id="copy-created-pin-btn"><i class="fas fa-copy"></i> Copy key</button>
                 <button type="button" class="btn primary" id="enter-created-room-btn">Enter room</button>
             </div>
         </div>

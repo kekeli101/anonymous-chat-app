@@ -55,6 +55,8 @@ const socket = io({
   const toastContainer = document.getElementById('toast-container');
 
   const roomCreatedModal = document.getElementById('room-created-modal');
+  const roomCreatedModalTitle = roomCreatedModal ? roomCreatedModal.querySelector('h2') : null;
+  const roomCreatedModalText = document.getElementById('room-created-modal-text');
   const createdPinDisplay = document.getElementById('created-pin-display');
   const createdRoomNameLabel = document.getElementById('created-room-name-label');
   const copyCreatedPinBtn = document.getElementById('copy-created-pin-btn');
@@ -282,6 +284,13 @@ const socket = io({
   function updateAdminUi() {
     adminControls.style.display = isAdmin ? 'block' : 'none';
     if (adminKeyBtn) adminKeyBtn.style.display = isAdmin ? 'none' : 'flex';
+    if (deleteRoomBtn) {
+      const count = parseInt(userCountDisplay.textContent, 10) || roomUsers.length || 1;
+      deleteRoomBtn.disabled = count > 1;
+      deleteRoomBtn.title = count > 1
+        ? 'Ask everyone else to leave before deleting the room'
+        : 'Delete this room';
+    }
   }
   
   // Remove everything in the chat area except the first (static welcome) message
@@ -323,19 +332,20 @@ const socket = io({
   
     if (currentType === 'private') {
       html += `<div><i class="fas fa-key"></i> Private room key: <strong>${currentRoom}</strong> ` +
-        `<button class="btn-icon copy-btn" data-copy="${currentRoom}" title="Copy key"><i class="fas fa-copy"></i></button></div>`;
+        `<button class="btn-icon copy-btn" data-copy="${currentRoom}" title="Copy key"><i class="fas fa-copy"></i></button></div>` +
+        `<div class="admin-key-warning"><i class="fas fa-shield-halved"></i> Only the room admin can delete this room, and only after everyone else has left.</div>`;
     } else {
       html += `<div><i class="fas fa-globe"></i> Public room — anyone with the link can join.</div>`;
+      if (currentDeleteCode) {
+        html += `<div class="admin-key-warning"><i class="fas fa-shield-halved"></i> Save your 6-digit delete code to unlock admin controls. The room is removed once everyone has left.</div>` +
+          `<div><i class="fas fa-shield-halved"></i> Delete code: ` +
+          `<code>${currentDeleteCode}</code> ` +
+          `<button class="btn-icon copy-btn" data-copy="${currentDeleteCode}" title="Copy delete code"><i class="fas fa-copy"></i></button></div>`;
+      }
     }
   
     html += `<div><i class="fas fa-link"></i> Invite link: ` +
       `<button class="btn-icon copy-btn" data-copy="${link}" title="Copy invite link"><i class="fas fa-copy"></i> Copy link</button></div>`;
-  
-    if (currentDeleteCode) {
-      html += `<div class="admin-key-warning"><i class="fas fa-shield-halved"></i> Save your 6-digit delete code — you need it to delete this room: ` +
-        `<code>${currentDeleteCode}</code> ` +
-        `<button class="btn-icon copy-btn" data-copy="${currentDeleteCode}" title="Copy delete code"><i class="fas fa-copy"></i></button></div>`;
-    }
   
     card.innerHTML = html;
     chatMessages.appendChild(card);
@@ -376,7 +386,6 @@ const socket = io({
             onConfirm: () => {
               socket.emit('removeUser', {
                 roomKey: currentRoom,
-                deleteCode: currentDeleteCode,
                 targetId: u.id
               });
             },
@@ -615,18 +624,17 @@ const socket = io({
   });
 
   deleteRoomBtn.addEventListener('click', () => {
-    if (!currentRoom) return;
-    openPinModal({
-      title: 'Delete room',
-      description: 'Enter your 6-digit delete PIN to continue.',
-      onConfirm: (code) => {
-        openConfirmModal({
-          title: '<i class="fas fa-triangle-exclamation"></i> Delete room?',
-          message: 'This removes the room for everyone. This cannot be undone.',
-          onConfirm: () => {
-            socket.emit('deleteRoom', { roomKey: currentRoom, deleteCode: code });
-          },
-        });
+    if (!currentRoom || !isAdmin) return;
+    const count = parseInt(userCountDisplay.textContent, 10) || roomUsers.length;
+    if (count > 1) {
+      showToast('This room can only be deleted when no one else is in it.', 'error');
+      return;
+    }
+    openConfirmModal({
+      title: '<i class="fas fa-triangle-exclamation"></i> Delete room?',
+      message: 'You are the last person here. Delete this room permanently?',
+      onConfirm: () => {
+        socket.emit('deleteRoom', { roomKey: currentRoom });
       },
     });
   });
@@ -658,9 +666,10 @@ const socket = io({
 
   copyCreatedPinBtn.addEventListener('click', () => {
     const pin = createdPinDisplay.textContent;
+    const isPrivate = pendingRoomEntry && pendingRoomEntry.type === 'private';
     navigator.clipboard.writeText(pin)
-      .then(() => showToast('Delete PIN copied', 'success'))
-      .catch(() => showToast('Could not copy PIN', 'error'));
+      .then(() => showToast(isPrivate ? 'Room key copied' : 'Delete PIN copied', 'success'))
+      .catch(() => showToast('Could not copy', 'error'));
   });
 
   enterCreatedRoomBtn.addEventListener('click', () => {
@@ -679,9 +688,12 @@ const socket = io({
   });
   
   adminKeyBtn.addEventListener('click', () => {
+    const isPrivate = currentType === 'private';
     openPinModal({
       title: 'Admin access',
-      description: 'Enter the room delete PIN to unlock admin controls.',
+      description: isPrivate
+        ? 'Enter your 6-digit room key to unlock admin controls.'
+        : 'Enter the room delete PIN to unlock admin controls.',
       onConfirm: (code) => {
         pendingDeleteCode = code;
         socket.emit('authenticateAdmin', { roomKey: currentRoom, deleteCode: code });
@@ -725,8 +737,32 @@ const socket = io({
     pendingRoomEntry = data;
     createdPinDisplay.textContent = data.deleteCode;
     createdRoomNameLabel.textContent = data.name || (data.type === 'private' ? 'Private room' : 'Room');
+
+    if (data.type === 'private') {
+      if (roomCreatedModalTitle) {
+        roomCreatedModalTitle.innerHTML = '<i class="fas fa-check-circle"></i> Private room created!';
+      }
+      if (roomCreatedModalText) {
+        roomCreatedModalText.innerHTML = 'Share this <strong>6-digit room key</strong> so others can join. You are the room admin. The room is removed once everyone has left.';
+      }
+      if (copyCreatedPinBtn) {
+        copyCreatedPinBtn.innerHTML = '<i class="fas fa-copy"></i> Copy key';
+      }
+      showToast('Room created! Save your room key.', 'success');
+    } else {
+      if (roomCreatedModalTitle) {
+        roomCreatedModalTitle.innerHTML = '<i class="fas fa-check-circle"></i> Room created!';
+      }
+      if (roomCreatedModalText) {
+        roomCreatedModalText.innerHTML = 'Save this <strong>6-digit delete PIN</strong> to unlock admin controls later. The room is removed once everyone has left.';
+      }
+      if (copyCreatedPinBtn) {
+        copyCreatedPinBtn.innerHTML = '<i class="fas fa-copy"></i> Copy PIN';
+      }
+      showToast('Room created! Save your delete PIN.', 'success');
+    }
+
     roomCreatedModal.classList.remove('hidden');
-    showToast('Room created! Save your delete PIN.', 'success');
   });
 
   socket.on('roomJoined', (data) => {
@@ -791,6 +827,16 @@ const socket = io({
     pendingDeleteCode = null;
   });
 
+  socket.on('promotedToAdmin', (data) => {
+    isAdmin = true;
+    if (data.users) roomUsers = data.users;
+    if (data.userCount != null) userCountDisplay.textContent = data.userCount;
+    updateAdminUi();
+    renderMembers();
+    addSystemMessage(data.message || 'You are now the room admin.');
+    showToast('You are now the room admin', 'success');
+  });
+
   socket.on('publicRoomsUpdated', (data) => {
     if (greetingPage.classList.contains('active')) {
       renderPublicRooms(data.rooms || []);
@@ -805,6 +851,7 @@ const socket = io({
     roomUsers = data.users || [];
     userCountDisplay.textContent = data.userCount;
     renderMembers();
+    updateAdminUi();
   });
   
   socket.on('userTyping', (data) => {
@@ -822,11 +869,13 @@ const socket = io({
   socket.on('userJoined', (data) => {
     addSystemMessage(`${data.username} has joined the room`);
     userCountDisplay.textContent = data.userCount;
+    updateAdminUi();
   });
   
   socket.on('userLeft', (data) => {
     addSystemMessage(`${data.username} has left the room`);
     userCountDisplay.textContent = data.userCount;
+    updateAdminUi();
   });
   
   socket.on('systemMessage', (data) => {
