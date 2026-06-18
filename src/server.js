@@ -3,6 +3,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const cors = require('cors');
+const crypto = require('crypto');
 
 // Initialize Express app
 const app = express();
@@ -21,10 +22,18 @@ const io = socketIo(server, {
 });
 
 // Store active rooms
+// roomKey -> {
+//   type: 'public' | 'private',
+//   adminKey: string,            // secret management key: remove users / delete room
+//   creator: socketId,           // informational only
+//   admins: Set<socketId>,       // sockets currently authenticated as admin
+//   users: Map<socketId, username>,
+//   createdAt: Date,
+//   lastActivity: Date,
+//   messages: []
+// }
 const activeRooms = new Map();
-const pendingDeletion = new Map();
 
-const ROOM_GRACE_PERIOD = 30 * 1000; // 30 seconds
 // Get port from environment variable or use default
 const PORT = process.env.PORT || 3000;
 
@@ -37,11 +46,34 @@ if (RENDER_EXTERNAL_URL) {
     }).on('error', (err) => {
       console.error(`Self-ping error: ${err.message}`);
     });
-  }, 14 * 60 * 1000); // Ping every 14 minutes (Render's free tier sleeps after 15 mins of inactivity)
+  }, 14 * 60 * 1000); // Ping every 14 minutes
 }
 
-// Generate a random 6-digit room key
-function generateRoomKey() {
+// OPTIONAL safety valve. Disabled by default so rooms truly never auto-delete.
+// Set ROOM_INACTIVITY_LIMIT_MS (in ms) to auto-remove rooms with no activity
+// (messages/joins) for that long. Leave it unset to keep every room forever
+// (until deleted with the admin key, or the server restarts).
+const ROOM_INACTIVITY_LIMIT_MS = process.env.ROOM_INACTIVITY_LIMIT_MS
+  ? Number(process.env.ROOM_INACTIVITY_LIMIT_MS)
+  : null;
+
+if (ROOM_INACTIVITY_LIMIT_MS) {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [roomKey, room] of activeRooms.entries()) {
+      if (now - new Date(room.lastActivity).getTime() > ROOM_INACTIVITY_LIMIT_MS) {
+        io.to(roomKey).emit('roomClosed', { message: 'Room closed due to long inactivity' });
+        activeRooms.delete(roomKey);
+        console.log(`Room removed (inactivity): ${roomKey}`);
+      }
+    }
+  }, 60 * 1000);
+}
+
+// --- Key / id generators -----------------------------------------------------
+
+// 6-digit numeric key for PRIVATE rooms (the secret you share to let people in)
+function generatePrivateKey() {
   let key;
   do {
     key = Math.floor(100000 + Math.random() * 900000).toString();
@@ -49,114 +81,180 @@ function generateRoomKey() {
   return key;
 }
 
+// Longer, link-friendly id for PUBLIC rooms (shared openly via link)
+function generatePublicId() {
+  let id;
+  do {
+    id = crypto.randomBytes(6).toString('hex'); // 12 hex chars
+  } while (activeRooms.has(id));
+  return id;
+}
+
+// Secret management key returned to the creator. NOT needed to join — only to
+// remove users or delete the room. This is what keeps a room manageable even
+// after the creator has left.
+function generateAdminKey() {
+  return crypto.randomBytes(16).toString('hex'); // 32 hex chars
+}
+
 // Generate a random username
 function generateUsername() {
   const adjectives = [
-    'Silent', 'Hidden', 'Shadow', 'Secret', 'Masked','Mad',
+    'Silent', 'Hidden', 'Shadow', 'Secret', 'Masked', 'Mad',
     'Lost', 'Midnight', 'Ghostly', 'Wandering', 'Unknown',
     'Cosmic', 'Nebulous', 'Encrypted', 'Phantom', 'Veiled'
   ];
-  
   const animals = [
-    'Raven', 'Wolf', 'Panther', 'Fox', 'Owl','Dog',
+    'Raven', 'Wolf', 'Panther', 'Fox', 'Owl', 'Dog',
     'Serpent', 'Falcon', 'Moth', 'Jaguar', 'Lynx'
   ];
-
-  
   const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
   const randomAnimal = animals[Math.floor(Math.random() * animals.length)];
-  
   return `${randomAdjective}-${randomAnimal}`;
 }
 
-// Socket.IO connection handler
+// --- Helpers -----------------------------------------------------------------
+
+function publicUserList(room) {
+  return Array.from(room.users.entries()).map(([id, username]) => ({ id, username }));
+}
+
+function emitUserList(roomKey, room) {
+  io.to(roomKey).emit('roomUsers', {
+    users: publicUserList(room),
+    userCount: room.users.size
+  });
+}
+
+function isAuthorisedAdmin(room, socketId, adminKey) {
+  return room.admins.has(socketId) || (!!adminKey && adminKey === room.adminKey);
+}
+
+// --- Socket.IO ---------------------------------------------------------------
+
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
-  
-  // Create a new room
-  socket.on('createRoom', () => {
-    const roomKey = generateRoomKey();
+
+  // Create a new room (public or private)
+  socket.on('createRoom', (data = {}) => {
+    const type = data.type === 'public' ? 'public' : 'private';
+    const roomKey = type === 'public' ? generatePublicId() : generatePrivateKey();
+    const adminKey = generateAdminKey();
     const username = generateUsername();
-    
-    // Store room information
-    activeRooms.set(roomKey, {
-      admin: socket.id,
+
+    const room = {
+      type,
+      adminKey,
+      creator: socket.id,
+      admins: new Set([socket.id]),
       users: new Map([[socket.id, username]]),
       createdAt: new Date(),
-      messages: [] // Store messages for reply functionality
-    });
-    
-    // Join the room
+      lastActivity: new Date(),
+      messages: []
+    };
+
+    activeRooms.set(roomKey, room);
     socket.join(roomKey);
-    
-    // Send room information to the client
+
     socket.emit('roomCreated', {
       roomKey,
+      type,
+      adminKey,        // creator stores this to manage the room later
       username,
       isAdmin: true,
-      userCount: 1 // Initial user count
+      userCount: 1
     });
-    
-    console.log(`Room created: ${roomKey} by ${username} (${socket.id})`);
+
+    console.log(`${type} room created: ${roomKey} by ${username} (${socket.id})`);
   });
-  
-  // Join an existing room
+
+  // Join an existing room (public link or private key — both look up by id)
   socket.on('joinRoom', (data) => {
     const { roomKey } = data;
-    
-    // Check if room exists
+    const adminKey = data && data.adminKey ? data.adminKey : null;
+
     if (!activeRooms.has(roomKey)) {
       socket.emit('error', { message: 'Room not found' });
       return;
     }
-    
+
     const room = activeRooms.get(roomKey);
     const username = generateUsername();
-    
-    // Add user to room
+
     room.users.set(socket.id, username);
-    
-    // Join the room
+    room.lastActivity = new Date();
     socket.join(roomKey);
-    
-    // Send room information to the client
+
+    // Returning creator / moderator may pass the management key to regain admin
+    let isAdmin = false;
+    if (adminKey && adminKey === room.adminKey) {
+      room.admins.add(socket.id);
+      isAdmin = true;
+    }
+
     socket.emit('roomJoined', {
       roomKey,
+      type: room.type,
       username,
-      isAdmin: socket.id === room.admin,
-      userCount: room.users.size, // Current user count
-      messages: room.messages // Send existing messages for history
+      isAdmin,
+      userCount: room.users.size,
+      messages: room.messages,
+      users: publicUserList(room)
     });
-    
-    // Notify other users in the room
+
     socket.to(roomKey).emit('userJoined', {
       username,
       timestamp: new Date(),
-      userCount: room.users.size // Updated user count
+      userCount: room.users.size
     });
-    
-    console.log(`User joined room: ${roomKey} as ${username} (${socket.id})`);
+
+    emitUserList(roomKey, room);
+
+    console.log(`User joined ${room.type} room ${roomKey} as ${username} (${socket.id})`);
   });
-  
+
+  // Unlock admin controls by supplying the management key after joining
+  socket.on('authenticateAdmin', (data) => {
+    const { roomKey, adminKey } = data || {};
+    const room = activeRooms.get(roomKey);
+
+    if (!room) {
+      socket.emit('error', { message: 'Room not found' });
+      return;
+    }
+    if (!room.users.has(socket.id)) {
+      socket.emit('error', { message: 'Join the room first' });
+      return;
+    }
+
+    if (adminKey && adminKey === room.adminKey) {
+      room.admins.add(socket.id);
+      socket.emit('adminAuthenticated', {
+        success: true,
+        users: publicUserList(room),
+        userCount: room.users.size
+      });
+    } else {
+      socket.emit('adminAuthenticated', { success: false, message: 'Invalid management key' });
+    }
+  });
+
   // Change username
   socket.on('changeUsername', (data) => {
-    const { newUsername } = data;
-    
-    // Find the room the user is in
+    const clean = ((data && data.newUsername) || '').toString().trim().slice(0, 30);
+    if (!clean) return;
+
     for (const [roomKey, room] of activeRooms.entries()) {
       if (room.users.has(socket.id)) {
         const oldUsername = room.users.get(socket.id);
-        
-        // Update username
-        room.users.set(socket.id, newUsername);
-        
-        // Notify all users in the room
+        room.users.set(socket.id, clean);
+        room.lastActivity = new Date();
+
         io.to(roomKey).emit('systemMessage', {
-          message: `${oldUsername} has changed their name to ${newUsername}`,
+          message: `${oldUsername} has changed their name to ${clean}`,
           timestamp: new Date()
         });
-        
-        console.log(`User in room ${roomKey} changed name from ${oldUsername} to ${newUsername}`);
+        emitUserList(roomKey, room);
         return;
       }
     }
@@ -165,45 +263,41 @@ io.on('connection', (socket) => {
   // Send a message to the room
   socket.on('sendMessage', (data) => {
     const { roomKey, message, replyTo } = data;
-    
-    // Check if room exists
+
     if (!activeRooms.has(roomKey)) {
       socket.emit('error', { message: 'Room not found' });
       return;
     }
-    
-    if (pendingDeletion.has(roomKey)) {
-      clearTimeout(pendingDeletion.get(roomKey));
-      pendingDeletion.delete(roomKey);
-    }
-  
+
     const room = activeRooms.get(roomKey);
+    if (!room.users.has(socket.id)) {
+      socket.emit('error', { message: 'You are not in this room' });
+      return;
+    }
+
     const username = room.users.get(socket.id);
-    
-    // Create message object with unique ID
+    const text = (message || '').toString();
+    if (!text.trim()) return;
+
     const messageObj = {
-      id: Date.now() + Math.random().toString(36).substr(2, 5), // Generate unique ID
+      id: Date.now() + Math.random().toString(36).substr(2, 5),
       username,
-      message,
+      message: text,
       timestamp: new Date(),
-      replyTo // Include reply information if present
+      replyTo
     };
-    
-    // Store message in room history
+
     room.messages.push(messageObj);
-    
-    // Limit message history to prevent memory issues (keep last 100 messages)
     if (room.messages.length > 100) {
       room.messages = room.messages.slice(-100);
     }
-    
-    // Broadcast message to all users in the room
+    room.lastActivity = new Date();
+
     io.to(roomKey).emit('newMessage', messageObj);
-    
-    console.log(`Message in room ${roomKey} from ${username}: ${message}`);
+    console.log(`Message in room ${roomKey} from ${username}: ${text}`);
   });
-  
-  // Typing indicator
+
+  // Typing indicators
   socket.on('typing', (data) => {
     const { roomKey } = data;
     const room = activeRooms.get(roomKey);
@@ -222,89 +316,87 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Close the room (admin only)
-  socket.on('closeRoom', (data) => {
-    const { roomKey } = data;
-    
-    // Check if room exists
-    if (!activeRooms.has(roomKey)) {
+  // Remove a user from the room (requires the management key)
+  socket.on('removeUser', (data) => {
+    const { roomKey, adminKey, targetId } = data || {};
+    const room = activeRooms.get(roomKey);
+
+    if (!room) {
       socket.emit('error', { message: 'Room not found' });
       return;
     }
-    
-    const room = activeRooms.get(roomKey);
-    
-    // Check if user is admin
-    if (socket.id !== room.admin) {
-      socket.emit('error', { message: 'Only the admin can close the room' });
+    if (!isAuthorisedAdmin(room, socket.id, adminKey)) {
+      socket.emit('error', { message: 'Invalid management key' });
       return;
     }
-    
-    // Notify all users in the room
-    io.to(roomKey).emit('roomClosed', {
-      message: 'The room has been closed by the admin'
+    if (!room.users.has(targetId)) {
+      socket.emit('error', { message: 'User is no longer in the room' });
+      return;
+    }
+
+    const targetUsername = room.users.get(targetId);
+    room.users.delete(targetId);
+    room.admins.delete(targetId);
+
+    io.to(targetId).emit('removedFromRoom', {
+      message: 'You have been removed from the room by an admin'
     });
-    
-    // Remove room
-    activeRooms.delete(roomKey);
-    
-    console.log(`Room closed: ${roomKey}`);
+    const targetSocket = io.sockets.sockets.get(targetId);
+    if (targetSocket) targetSocket.leave(roomKey);
+
+    io.to(roomKey).emit('systemMessage', {
+      message: `${targetUsername} was removed by an admin`,
+      timestamp: new Date()
+    });
+    emitUserList(roomKey, room);
+    console.log(`User ${targetUsername} removed from ${roomKey}`);
   });
-  
-  // User disconnects
+
+  // Delete the room entirely (requires the management key)
+  socket.on('deleteRoom', (data) => {
+    const { roomKey, adminKey } = data || {};
+    const room = activeRooms.get(roomKey);
+
+    if (!room) {
+      socket.emit('error', { message: 'Room not found' });
+      return;
+    }
+    if (!isAuthorisedAdmin(room, socket.id, adminKey)) {
+      socket.emit('error', {
+        message: 'Invalid management key — only someone with the key can delete this room'
+      });
+      return;
+    }
+
+    io.to(roomKey).emit('roomClosed', { message: 'This room has been deleted by an admin' });
+    activeRooms.delete(roomKey);
+    console.log(`Room deleted: ${roomKey}`);
+  });
+
+  // User disconnects — remove them but KEEP the room alive (even if empty)
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
-  
+
     for (const [roomKey, room] of activeRooms.entries()) {
       if (room.users.has(socket.id)) {
         const username = room.users.get(socket.id);
         room.users.delete(socket.id);
-  
+        room.admins.delete(socket.id);
+
         socket.to(roomKey).emit('userLeft', {
           username,
           timestamp: new Date(),
           userCount: room.users.size
         });
-  
-        console.log(`User left room: ${roomKey} - ${username} (${socket.id})`);
-  
-        if (socket.id === room.admin) {
-          const remainingUsers = Array.from(room.users.keys());
-          if (remainingUsers.length > 0) {
-            const newAdminId = remainingUsers[0];
-            room.admin = newAdminId;
-            io.to(roomKey).emit('adminChanged', {
-              newAdminId,
-              message: `Admin role transferred to ${room.users.get(newAdminId)}`
-            });
-            console.log(`Admin role in room ${roomKey} transferred to ${room.users.get(newAdminId)}`);
-          }
-        }
-  
-        // Instead of deleting immediately, schedule deletion with a grace period
-        if (room.users.size === 0) {
-          scheduleRoomDeletion(roomKey);
-        }
+        emitUserList(roomKey, room);
+
+        // Room is intentionally NOT deleted, even when empty. It only goes away
+        // when someone deletes it with the management key (or, optionally, after
+        // long inactivity if ROOM_INACTIVITY_LIMIT_MS is set).
+        console.log(`User left ${roomKey}: ${username} (${socket.id})`);
       }
     }
   });
-  
-  function scheduleRoomDeletion(roomKey) {
-    // Avoid stacking multiple timers for the same room
-    if (pendingDeletion.has(roomKey)) return;
-  
-    const timeout = setTimeout(() => {
-      const room = activeRooms.get(roomKey);
-      // Double-check it's still empty before actually deleting
-      if (room && room.users.size === 0) {
-        activeRooms.delete(roomKey);
-        console.log(`Room removed after grace period (empty): ${roomKey}`);
-      }
-      pendingDeletion.delete(roomKey);
-    }, ROOM_GRACE_PERIOD);
-  
-    pendingDeletion.set(roomKey, timeout);
-  }
 });
 
 // Routes
@@ -314,16 +406,13 @@ app.get('/', (req, res) => {
 
 // For Vercel serverless functions
 if (process.env.VERCEL) {
-  // Export the express app for Vercel serverless deployment
   module.exports = app;
 } else {
-  // Start server for local development
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
 
-// Export for Vercel
 module.exports = app;
 
-// Last updated: 2026-03-15 07:47:00
+// Last updated: 2026-06-18

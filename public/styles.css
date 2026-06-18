@@ -284,7 +284,7 @@ input[type="text"]:focus {
 .header-actions {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
 }
 
 .theme-toggle {
@@ -629,6 +629,10 @@ input[type="text"]:focus {
     z-index: 5;
 }
 
+.scroll-to-bottom-btn.visible {
+    display: flex;
+}
+
 /* ============================================
    USERNAME EDITING
    ============================================ */
@@ -655,6 +659,138 @@ input[type="text"]:focus {
 #edit-icon {
     font-size: 0.8rem;
     opacity: 0.8;
+}
+
+/* ============================================
+   CREATE OPTIONS / ROOM INFO / MEMBERS PANEL
+   ============================================ */
+
+.create-options {
+    flex-direction: column;
+    width: 100%;
+    max-width: 340px;
+}
+
+.create-options .btn {
+    width: 100%;
+    margin: 0;
+}
+
+/* Header icon buttons sit on the coloured header => keep them light */
+.header-actions .btn-icon {
+    color: #fff;
+    padding: 8px;
+    border-radius: 50%;
+}
+
+.header-actions .btn-icon:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+#admin-key-btn {
+    display: none; /* shown only when you are NOT yet an admin */
+}
+
+/* Room info card (invite link + keys) shown on create/join */
+.room-info-card {
+    align-self: stretch;
+    text-align: left;
+    max-width: 680px;
+    margin: 12px auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    line-height: 1.6;
+}
+
+.room-info-card code {
+    background: rgba(0, 0, 0, 0.08);
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    word-break: break-all;
+}
+
+[data-theme="dark"] .room-info-card code {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.admin-key-warning {
+    background: rgba(255, 193, 7, 0.15);
+    border: 1px dashed #ffc107;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+.copy-btn.copied {
+    color: #2ecc71 !important;
+}
+
+/* Members slide-in panel */
+.members-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 280px;
+    max-width: 85%;
+    background: var(--card-bg);
+    box-shadow: -4px 0 16px var(--shadow-color);
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+}
+
+.members-panel.active {
+    transform: translateX(0);
+}
+
+.members-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    border-bottom: 1px solid var(--input-border);
+}
+
+.members-header h3 {
+    font-size: 1rem;
+    color: var(--heading-color);
+    font-weight: 600;
+}
+
+.members-list {
+    padding: 0.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.member-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 8px;
+}
+
+.member-item:hover {
+    background: var(--system-msg-bg);
+}
+
+.member-name {
+    font-size: 0.95rem;
+    color: var(--text-color);
+}
+
+.member-remove {
+    color: #ff4757;
+}
+
+.member-remove:hover {
+    color: #ff2336;
 }
 
 /* ============================================
@@ -685,6 +821,10 @@ input[type="text"]:focus {
     .chat-input-container {
         padding: 10px;
     }
+
+    .header-actions {
+        gap: 0.4rem;
+    }
 }
 
 @media (max-width: 480px) {
@@ -692,8 +832,8 @@ input[type="text"]:focus {
         max-width: 90%;
     }
 
-    .btn {
+    .create-options .btn {
         width: 100%;
-        margin: 0.5rem 0;
+        margin: 0;
     }
 }

@@ -17,12 +17,15 @@
         <div class="container">
             <h1>Anonymous Chat</h1>
             <p>Connect and chat with people anonymously in real-time</p>
-            <div class="button-group">
-                <button id="create-room-btn" class="btn primary">
-                    <i class="fas fa-plus-circle"></i> Create Room
+            <div class="button-group create-options">
+                <button id="create-public-btn" class="btn primary">
+                    <i class="fas fa-globe"></i> Create Public Room
+                </button>
+                <button id="create-private-btn" class="btn primary">
+                    <i class="fas fa-lock"></i> Create Private Room
                 </button>
                 <button id="join-room-btn" class="btn secondary">
-                    <i class="fas fa-door-open"></i> Join Room
+                    <i class="fas fa-door-open"></i> Join Private Room
                 </button>
             </div>
             <div class="ad-container ad-container--landing">
@@ -36,11 +39,11 @@
         </div>
     </div>
 
-    <!-- Join Room Page -->
+    <!-- Join Room Page (private rooms only) -->
     <div id="join-room-page" class="page">
         <div class="container">
             <h1>Join a Room</h1>
-            <p>Enter the 6-digit room key to join an existing chat</p>
+            <p>Enter the 6-digit room key to join a private chat</p>
             <div class="input-group">
                 <input 
                     type="text" 
@@ -84,27 +87,38 @@
                     <button id="theme-toggle" class="btn-icon theme-toggle" title="Toggle Dark Mode">
                         <i class="fas fa-moon"></i>
                     </button>
+                    <button id="admin-key-btn" class="btn-icon" title="Unlock admin with management key">
+                        <i class="fas fa-lock"></i>
+                    </button>
+                    <button id="members-btn" class="btn-icon" title="Members">
+                        <i class="fas fa-user-group"></i>
+                    </button>
                     <div class="user-count">
                         <p><i class="fas fa-users"></i> <span id="user-count-display">1</span></p>
                     </div>
                 </div>
                 <div class="admin-controls" id="admin-controls">
-                    <button id="close-room-btn" class="btn danger">
-                        <i class="fas fa-power-off"></i> Close
+                    <button id="delete-room-btn" class="btn danger">
+                        <i class="fas fa-trash"></i> Delete
                     </button>
                 </div>
+            </div>
+
+            <!-- Members Panel -->
+            <div class="members-panel" id="members-panel">
+                <div class="members-header">
+                    <h3><i class="fas fa-user-group"></i> Members</h3>
+                    <button id="members-close" class="btn-icon" title="Close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="members-list" id="members-list"></div>
             </div>
 
             <!-- Chat Messages Area -->
             <div class="chat-messages" id="chat-messages">
                 <div class="system-message">
                     <i class="fas fa-info-circle"></i> Welcome to the chat room! You can now start chatting anonymously.
-                </div>
-                <div class="system-message">
-                    <i class="fas fa-key"></i> Room Key: <span id="room-key-info"></span> 
-                    <button id="copy-room-key" class="btn-icon" title="Copy Invite Link">
-                        <i class="fas fa-copy"></i>
-                    </button>
                 </div>
             </div>
 
