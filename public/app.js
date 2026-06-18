@@ -282,7 +282,7 @@ const socket = io({
   }
   
   function updateAdminUi() {
-    adminControls.style.display = isAdmin ? 'block' : 'none';
+    adminControls.style.display = isAdmin ? 'flex' : 'none';
     if (adminKeyBtn) adminKeyBtn.style.display = isAdmin ? 'none' : 'flex';
     if (deleteRoomBtn) {
       const count = parseInt(userCountDisplay.textContent, 10) || roomUsers.length || 1;
