@@ -210,14 +210,50 @@ const socket = io({
   
   // --- Helpers -----------------------------------------------------------------
   
-  function loadAdsInPage(page) {
-    page.querySelectorAll('ins.adsbygoogle:not([data-ad-loaded])').forEach((ad) => {
-      ad.setAttribute('data-ad-loaded', 'true');
-      try {
-        (adsbygoogle = window.adsbygoogle || []).push({});
-      } catch (e) {
-        console.warn('AdSense load skipped:', e);
+  function ensureAdSenseScript() {
+    return new Promise((resolve) => {
+      if (window.adsbygoogle && window.adsbygoogle.loaded) {
+        resolve();
+        return;
       }
+      const existing = document.querySelector('script[src*="adsbygoogle.js"]');
+      if (existing) {
+        if (existing.dataset.loaded === 'true') {
+          resolve();
+          return;
+        }
+        existing.addEventListener('load', () => {
+          existing.dataset.loaded = 'true';
+          resolve();
+        });
+        return;
+      }
+      const script = document.createElement('script');
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+      script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8537594804200864';
+      script.onload = () => {
+        script.dataset.loaded = 'true';
+        resolve();
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  function loadAdsInPage(page) {
+    ensureAdSenseScript().then(() => {
+      page.querySelectorAll('ins.adsbygoogle:not([data-ad-loaded])').forEach((ad) => {
+        if (ad.getAttribute('data-adsbygoogle-status')) {
+          ad.setAttribute('data-ad-loaded', 'true');
+          return;
+        }
+        ad.setAttribute('data-ad-loaded', 'true');
+        try {
+          (adsbygoogle = window.adsbygoogle || []).push({});
+        } catch (e) {
+          console.warn('AdSense load skipped:', e);
+        }
+      });
     });
   }
   
