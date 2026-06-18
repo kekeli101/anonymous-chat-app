@@ -22,7 +22,9 @@ const io = socketIo(server, {
 
 // Store active rooms
 const activeRooms = new Map();
+const pendingDeletion = new Map();
 
+const ROOM_GRACE_PERIOD = 30 * 1000; // 30 seconds
 // Get port from environment variable or use default
 const PORT = process.env.PORT || 3000;
 
@@ -49,15 +51,22 @@ function generateRoomKey() {
 
 // Generate a random username
 function generateUsername() {
-  const adjectives = ['Red', 'Blue', 'Green', 'Yellow', 'Purple', 'Orange', 'Pink', 'Black', 'White', 'Gray'];
-  const animals = ['Lion', 'Tiger', 'Bear', 'Wolf', 'Fox', 'Eagle', 'Hawk', 'Dolphin', 'Shark', 'Elephant'];
-  const objects = ['Apple', 'Banana', 'Cherry', 'Diamond', 'Emerald', 'Fire', 'Galaxy', 'Hurricane', 'Ice', 'Jungle'];
+  const adjectives = [
+    'Silent', 'Hidden', 'Shadow', 'Secret', 'Masked','Mad',
+    'Lost', 'Midnight', 'Ghostly', 'Wandering', 'Unknown',
+    'Cosmic', 'Nebulous', 'Encrypted', 'Phantom', 'Veiled'
+  ];
+  
+  const animals = [
+    'Raven', 'Wolf', 'Panther', 'Fox', 'Owl','Dog',
+    'Serpent', 'Falcon', 'Moth', 'Jaguar', 'Lynx'
+  ];
+
   
   const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
   const randomAnimal = animals[Math.floor(Math.random() * animals.length)];
-  const randomObject = objects[Math.floor(Math.random() * objects.length)];
   
-  return `${randomAdjective}-${randomAnimal}-${randomObject}`;
+  return `${randomAdjective}-${randomAnimal}`;
 }
 
 // Socket.IO connection handler
@@ -163,6 +172,11 @@ io.on('connection', (socket) => {
       return;
     }
     
+    if (pendingDeletion.has(roomKey)) {
+      clearTimeout(pendingDeletion.get(roomKey));
+      pendingDeletion.delete(roomKey);
+    }
+  
     const room = activeRooms.get(roomKey);
     const username = room.users.get(socket.id);
     
@@ -240,51 +254,57 @@ io.on('connection', (socket) => {
   // User disconnects
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
-    
-    // Find rooms where user is a member
+  
     for (const [roomKey, room] of activeRooms.entries()) {
       if (room.users.has(socket.id)) {
         const username = room.users.get(socket.id);
-        
-        // Remove user from room
         room.users.delete(socket.id);
-        
-        // Notify other users in the room
+  
         socket.to(roomKey).emit('userLeft', {
           username,
           timestamp: new Date(),
-          userCount: room.users.size // Updated user count
+          userCount: room.users.size
         });
-        
+  
         console.log(`User left room: ${roomKey} - ${username} (${socket.id})`);
-        
-        // If user was admin, close the room
+  
         if (socket.id === room.admin) {
-          // Find a new admin
-          const remainingUsers = Array.from(room.users.keys()).filter(id => id !== socket.id);
+          const remainingUsers = Array.from(room.users.keys());
           if (remainingUsers.length > 0) {
-            const newAdminId = remainingUsers[0]; // Or choose based on other criteria
+            const newAdminId = remainingUsers[0];
             room.admin = newAdminId;
-            io.to(roomKey).emit("adminChanged", { newAdminId, message: `Admin role transferred to ${room.users.get(newAdminId)}` });
-            console.log(`Admin role in room ${roomKey} transferred to ${room.users.get(newAdminId)}`);
-          } else {
-            // If no other users, then close the room (optional, based on desired behavior)
-            io.to(roomKey).emit("roomClosed", {
-              message: "The room has been closed because the admin left and no other users remained"
+            io.to(roomKey).emit('adminChanged', {
+              newAdminId,
+              message: `Admin role transferred to ${room.users.get(newAdminId)}`
             });
-            activeRooms.delete(roomKey);
-            console.log(`Room closed (admin left, no users): ${roomKey}`);
+            console.log(`Admin role in room ${roomKey} transferred to ${room.users.get(newAdminId)}`);
           }
         }
-        
-        // If room is empty, remove it
+  
+        // Instead of deleting immediately, schedule deletion with a grace period
         if (room.users.size === 0) {
-          activeRooms.delete(roomKey);
-          console.log(`Room removed (empty): ${roomKey}`);
+          scheduleRoomDeletion(roomKey);
         }
       }
     }
   });
+  
+  function scheduleRoomDeletion(roomKey) {
+    // Avoid stacking multiple timers for the same room
+    if (pendingDeletion.has(roomKey)) return;
+  
+    const timeout = setTimeout(() => {
+      const room = activeRooms.get(roomKey);
+      // Double-check it's still empty before actually deleting
+      if (room && room.users.size === 0) {
+        activeRooms.delete(roomKey);
+        console.log(`Room removed after grace period (empty): ${roomKey}`);
+      }
+      pendingDeletion.delete(roomKey);
+    }, ROOM_GRACE_PERIOD);
+  
+    pendingDeletion.set(roomKey, timeout);
+  }
 });
 
 // Routes

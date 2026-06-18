@@ -1,499 +1,526 @@
 // Connect to Socket.IO server
 const socket = io({
-  transports: ['websocket', 'polling']
-});
-
-// DOM Elements
-const greetingPage = document.getElementById('greeting-page');
-const joinRoomPage = document.getElementById('join-room-page');
-const chatRoomPage = document.getElementById('chat-room-page');
-
-const createRoomBtn = document.getElementById('create-room-btn');
-const joinRoomBtn = document.getElementById('join-room-btn');
-const joinSubmitBtn = document.getElementById('join-submit-btn');
-const joinBackBtn = document.getElementById('join-back-btn');
-const closeRoomBtn = document.getElementById('close-room-btn');
-const sendMessageBtn = document.getElementById('send-message-btn');
-const copyRoomKeyBtn = document.getElementById('copy-room-key');
-
-const roomKeyInput = document.getElementById('room-key-input');
-const messageInput = document.getElementById('message-input');
-const chatMessages = document.getElementById('chat-messages');
-const joinErrorMessage = document.getElementById('join-error-message');
-
-const roomKeyDisplay = document.getElementById('room-key-display');
-const roomKeyInfo = document.getElementById('room-key-info');
-const usernameDisplay = document.getElementById('username-display');
-const userCountDisplay = document.getElementById('user-count-display');
-const adminControls = document.getElementById('admin-controls');
-
-const replyContainer = document.getElementById('reply-container');
-const replyUsername = document.getElementById('reply-username');
-const replyMessage = document.getElementById('reply-message');
-const cancelReplyBtn = document.getElementById('cancel-reply');
-
-const typingIndicator = document.getElementById('typing-indicator');
-const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
-const themeToggle = document.getElementById('theme-toggle');
-
-// App state
-let currentRoom = null;
-let currentUsername = null;
-let isAdmin = false;
-let replyingTo = null;
-let messageMap = new Map(); // Store messages by ID for reply functionality
-
-// Helper functions
-function loadAdsInPage(page) {
-    page.querySelectorAll('ins.adsbygoogle:not([data-ad-loaded])').forEach((ad) => {
-        ad.setAttribute('data-ad-loaded', 'true');
-        try {
-            (adsbygoogle = window.adsbygoogle || []).push({});
-        } catch (e) {
-            console.warn('AdSense load skipped:', e);
-        }
-    });
-}
-
-function showPage(page) {
-    // Hide all pages
-    greetingPage.classList.remove('active');
-    joinRoomPage.classList.remove('active');
-    chatRoomPage.classList.remove('active');
-    
-    // Show the selected page
-    page.classList.add('active');
-    requestAnimationFrame(() => loadAdsInPage(page));
-}
-
-function formatTimestamp(timestamp) {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function addMessage(messageObj, isOwnMessage = false) {
-    const { id, username, message, timestamp, replyTo } = messageObj;
-    
-    // Store message in map for reply functionality
-    messageMap.set(id, messageObj);
-    
-    const messageElement = document.createElement('div');
-    messageElement.classList.add('message');
-    messageElement.classList.add(isOwnMessage ? 'own-message' : 'other-message');
-    messageElement.dataset.messageId = id;
-    
-    // Add swipe hint icon
-    const swipeHint = document.createElement('div');
-    swipeHint.classList.add('swipe-hint');
-    swipeHint.innerHTML = '<i class="fas fa-reply"></i>';
-    messageElement.appendChild(swipeHint);
-    
-    const usernameElement = document.createElement('div');
-    usernameElement.classList.add('username');
-    usernameElement.textContent = username;
-    
-    // If this is a reply to another message, add the quote
-    if (replyTo && messageMap.has(replyTo)) {
-        const repliedMessage = messageMap.get(replyTo);
-        const quoteElement = document.createElement('div');
-        quoteElement.classList.add('reply-quote');
-        
-        const quoteUsername = document.createElement('div');
-        quoteUsername.classList.add('reply-quote-username');
-        quoteUsername.textContent = repliedMessage.username;
-        
-        const quoteText = document.createElement('div');
-        quoteText.textContent = repliedMessage.message.length > 50 
-            ? repliedMessage.message.substring(0, 50) + '...' 
-            : repliedMessage.message;
-        
-        quoteElement.appendChild(quoteUsername);
-        quoteElement.appendChild(quoteText);
-        messageElement.appendChild(quoteElement);
-    }
-    
-    messageElement.appendChild(usernameElement);
-    
-    const contentElement = document.createElement('div');
-    contentElement.classList.add('content');
-    contentElement.textContent = message;
-    messageElement.appendChild(contentElement);
-    
-    const timestampElement = document.createElement('div');
-    timestampElement.classList.add('timestamp');
-    timestampElement.textContent = formatTimestamp(timestamp);
-    messageElement.appendChild(timestampElement);
-    
-    chatMessages.appendChild(messageElement);
-    
-    // Set up Hammer.js for swipe gestures
-    if (typeof Hammer !== 'undefined') {
-        const hammer = new Hammer(messageElement);
-        hammer.on('swiperight', function(e) {
-            startReply(id);
-        });
-    }
-    
-    // Also detect touch start/end for visual feedback
-    messageElement.addEventListener('touchstart', function() {
-        this.classList.add('swiping');
-    });
-    
-    messageElement.addEventListener('touchend', function() {
-        this.classList.remove('swiping');
-    });
-    
-    // Auto-scroll to bottom
-    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
-}
-
-function startReply(messageId) {
-    if (!messageMap.has(messageId)) return;
-    
-    const messageObj = messageMap.get(messageId);
-    replyingTo = messageId;
-    
-    // Show reply container
-    replyContainer.classList.add('active');
-    replyUsername.textContent = messageObj.username;
-    replyMessage.textContent = messageObj.message.length > 30 
-        ? messageObj.message.substring(0, 30) + '...' 
-        : messageObj.message;
-    
-    // Focus input
-    messageInput.focus();
-}
-
-function cancelReply() {
-    replyingTo = null;
-    replyContainer.classList.remove('active');
-}
-
-function addSystemMessage(message) {
-    const messageElement = document.createElement('div');
-    messageElement.classList.add('system-message');
-    messageElement.textContent = message;
-    
-    chatMessages.appendChild(messageElement);
-    
-    // Auto-scroll to bottom
-    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
-}
-
-function sendMessage() {
-    const message = messageInput.value.trim();
-    
-    if (message && currentRoom) {
-        socket.emit('sendMessage', {
-            roomKey: currentRoom,
-            message,
-            replyTo: replyingTo
-        });
-        
-        messageInput.value = '';
-        messageInput.focus();
-        
-        // Clear reply state
-        if (replyingTo) {
-            cancelReply();
-        }
-    }
-}
-
-function updateTypingIndicator() {
-    const users = Array.from(typingUsers);
-    let text = '';
-
-    if (users.length === 1) {
-        text = `${users[0]} is typing...`;
-    } else if (users.length === 2) {
-        text = `${users[0]} and ${users[1]} are typing...`;
-    } else if (users.length > 2) {
-        text = `${users.length} people are typing...`;
-    }
-
-    typingIndicator.textContent = text;
-}
-
-// Theme Logic
-function initTheme() {
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    updateThemeIcon(savedTheme);
-}
-
-function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-    updateThemeIcon(newTheme);
-}
-
-function updateThemeIcon(theme) {
-    if (!themeToggle) return;
-    const icon = themeToggle.querySelector('i');
-    if (theme === 'dark') {
-        icon.classList.remove('fa-moon');
-        icon.classList.add('fa-sun');
-    } else {
-        icon.classList.remove('fa-sun');
-        icon.classList.add('fa-moon');
-    }
-}
-
-if (themeToggle) {
-    themeToggle.addEventListener('click', toggleTheme);
-}
-
-// Initialize theme
-initTheme();
-
-// Event listeners
-usernameDisplay.addEventListener('blur', () => {
-    const newUsername = usernameDisplay.textContent.trim();
-    if (newUsername && newUsername !== currentUsername) {
-        socket.emit('changeUsername', { newUsername });
-        currentUsername = newUsername; // Optimistic update
-    } else {
-        // Revert if empty or unchanged
-        usernameDisplay.textContent = currentUsername;
-    }
-});
-
-usernameDisplay.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        e.preventDefault(); // Prevent new line
-        usernameDisplay.blur(); // Trigger blur event to save
-    }
-});
-
-createRoomBtn.addEventListener('click', () => {
-    socket.emit('createRoom');
-});
-
-joinRoomBtn.addEventListener('click', () => {
-    showPage(joinRoomPage);
-    roomKeyInput.focus();
-});
-
-joinSubmitBtn.addEventListener('click', () => {
-    const roomKey = roomKeyInput.value.trim();
-    
-    if (roomKey.length !== 6 || !/^\d+$/.test(roomKey)) {
-        joinErrorMessage.textContent = 'Please enter a valid 6-digit room key';
-        return;
-    }
-    
-    socket.emit('joinRoom', { roomKey });
-});
-
-joinBackBtn.addEventListener('click', () => {
-    showPage(greetingPage);
-    joinErrorMessage.textContent = '';
-    roomKeyInput.value = '';
-});
-
-closeRoomBtn.addEventListener('click', () => {
-    if (currentRoom) {
-        if (confirm('Are you sure you want to close this room? All users will be disconnected.')) {
-            socket.emit('closeRoom', { roomKey: currentRoom });
-        }
-    }
-});
-
-cancelReplyBtn.addEventListener('click', () => {
-    cancelReply();
-});
-
-sendMessageBtn.addEventListener('click', () => {
-    sendMessage();
-});
-
-messageInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        sendMessage();
-    } else {
-        // Emit typing event
-        if (currentRoom) {
-            socket.emit('typing', { roomKey: currentRoom });
-        }
-    }
-});
-
-// Logic to stop typing after a delay
-let typingTimeout = null;
-messageInput.addEventListener('keyup', () => {
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(() => {
-        if (currentRoom) {
-            socket.emit('stopTyping', { roomKey: currentRoom });
-        }
-    }, 1500); // 1.5 seconds delay
-});
-
-copyRoomKeyBtn.addEventListener('click', () => {
-    const inviteLink = `${window.location.origin}/?room=${currentRoom}`;
-    navigator.clipboard.writeText(inviteLink)
-        .then(() => {
-            alert('Invitation link copied to clipboard!');
-        })
-        .catch(err => {
-            console.error('Could not copy text: ', err);
-        });
-});
-
-// Scroll to bottom button logic
-scrollToBottomBtn.addEventListener('click', () => {
-    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
-});
-
-chatMessages.addEventListener('scroll', () => {
-    // Show button if user is not at the bottom
-    const isAtBottom = chatMessages.scrollHeight - chatMessages.clientHeight <= chatMessages.scrollTop + 1; // +1 for tolerance
-    if (isAtBottom) {
-        scrollToBottomBtn.classList.remove('visible');
-    } else {
-        scrollToBottomBtn.classList.add('visible');
-    }
-});
-
-// Socket.IO event handlers
-socket.on('roomCreated', (data) => {
-    currentRoom = data.roomKey;
-    currentUsername = data.username;
-    isAdmin = data.isAdmin;
-    
-    roomKeyDisplay.textContent = currentRoom;
-    roomKeyInfo.textContent = currentRoom;
-    usernameDisplay.textContent = currentUsername;
-    userCountDisplay.textContent = data.userCount;
-    
-    // Show admin controls if user is admin
-    adminControls.style.display = isAdmin ? 'block' : 'none';
-    
-    // Reset message map
-    messageMap.clear();
-    
-    showPage(chatRoomPage);
-    messageInput.focus();
-});
-
-socket.on('roomJoined', (data) => {
-    currentRoom = data.roomKey;
-    currentUsername = data.username;
-    isAdmin = data.isAdmin;
-    
-    roomKeyDisplay.textContent = currentRoom;
-    roomKeyInfo.textContent = currentRoom;
-    usernameDisplay.textContent = currentUsername;
-    userCountDisplay.textContent = data.userCount;
-    
-    // Show admin controls if user is admin
-    adminControls.style.display = isAdmin ? 'block' : 'none';
-    
-    // Reset message map
-    messageMap.clear();
-    
-    // Load existing messages if any
-    if (data.messages && data.messages.length > 0) {
-        // Clear existing messages
-        while (chatMessages.firstChild) {
-            if (chatMessages.firstChild.classList && chatMessages.firstChild.classList.contains('system-message')) {
-                break;
-            }
-            chatMessages.removeChild(chatMessages.firstChild);
-        }
-        
-        // Add messages
-        data.messages.forEach(msg => {
-            const isOwnMessage = msg.username === currentUsername;
-            addMessage(msg, isOwnMessage);
-        });
-    }
-    
-    showPage(chatRoomPage);
-    messageInput.focus();
-    
-    // Clear join room form
-    joinErrorMessage.textContent = '';
-    roomKeyInput.value = '';
-});
-
-socket.on('newMessage', (data) => {
-    const isOwnMessage = data.username === currentUsername;
-    addMessage(data, isOwnMessage);
-});
-
-// Typing indicator handlers
-const typingUsers = new Set();
-
-socket.on('userTyping', (data) => {
-    if (data.username !== currentUsername) {
-        typingUsers.add(data.username);
-        updateTypingIndicator();
-    }
-});
-
-socket.on('userStopTyping', (data) => {
-    typingUsers.delete(data.username);
-    updateTypingIndicator();
-});
-
-socket.on('userJoined', (data) => {
-    addSystemMessage(`${data.username} has joined the room`);
-    userCountDisplay.textContent = data.userCount;
-});
-
-socket.on('userLeft', (data) => {
-    addSystemMessage(`${data.username} has left the room`);
-    userCountDisplay.textContent = data.userCount;
-});
-
-socket.on('systemMessage', (data) => {
-    addSystemMessage(data.message);
-});
-
-socket.on('roomClosed', (data) => {
-    alert(data.message);
-    showPage(greetingPage);
-    
-    // Reset state
-    currentRoom = null;
-    currentUsername = null;
-    isAdmin = false;
-    messageMap.clear();
-    
-    // Clear chat messages
-    while (chatMessages.firstChild) {
-        if (chatMessages.firstChild.classList && chatMessages.firstChild.classList.contains('system-message')) {
-            break;
-        }
-        chatMessages.removeChild(chatMessages.firstChild);
-    }
-});
-
-socket.on('error', (data) => {
-    if (joinRoomPage.classList.contains('active')) {
-        joinErrorMessage.textContent = data.message;
-    } else {
-        alert(data.message);
-    }
-});
-
-// Initialize
-const urlParams = new URLSearchParams(window.location.search);
-const roomKeyFromUrl = urlParams.get('room');
-
-if (roomKeyFromUrl && /^\d{6}$/.test(roomKeyFromUrl)) {
-    // Remove the room parameter from the URL to prevent re-joining on refresh
-    history.replaceState(null, '', window.location.pathname);
-
-    // Pre-fill the join room input and show the join page
-    roomKeyInput.value = roomKeyFromUrl;
-    showPage(joinRoomPage);
-    joinSubmitBtn.click(); // Automatically attempt to join
-} else {
-    showPage(greetingPage);
-}
+    transports: ['websocket', 'polling']
+  });
+  
+  // DOM Elements
+  const greetingPage = document.getElementById('greeting-page');
+  const joinRoomPage = document.getElementById('join-room-page');
+  const chatRoomPage = document.getElementById('chat-room-page');
+  
+  const createRoomBtn = document.getElementById('create-room-btn');
+  const joinRoomBtn = document.getElementById('join-room-btn');
+  const joinSubmitBtn = document.getElementById('join-submit-btn');
+  const joinBackBtn = document.getElementById('join-back-btn');
+  const closeRoomBtn = document.getElementById('close-room-btn');
+  const sendMessageBtn = document.getElementById('send-message-btn');
+  const copyRoomKeyBtn = document.getElementById('copy-room-key');
+  
+  const roomKeyInput = document.getElementById('room-key-input');
+  const messageInput = document.getElementById('message-input');
+  const chatMessages = document.getElementById('chat-messages');
+  const joinErrorMessage = document.getElementById('join-error-message');
+  
+  const roomKeyDisplay = document.getElementById('room-key-display');
+  const roomKeyInfo = document.getElementById('room-key-info');
+  const usernameDisplay = document.getElementById('username-display');
+  const userCountDisplay = document.getElementById('user-count-display');
+  const adminControls = document.getElementById('admin-controls');
+  
+  const replyContainer = document.getElementById('reply-container');
+  const replyUsername = document.getElementById('reply-username');
+  const replyMessage = document.getElementById('reply-message');
+  const cancelReplyBtn = document.getElementById('cancel-reply');
+  
+  const typingIndicator = document.getElementById('typing-indicator');
+  const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
+  const themeToggle = document.getElementById('theme-toggle');
+  
+  // App state
+  let currentRoom = null;
+  let currentUsername = null;
+  let isAdmin = false;
+  let replyingTo = null;
+  let messageMap = new Map(); // Store messages by ID for reply functionality
+  let isReconnecting = false; // True while we're attempting to silently rejoin after a drop
+  
+  // Helper functions
+  function loadAdsInPage(page) {
+      page.querySelectorAll('ins.adsbygoogle:not([data-ad-loaded])').forEach((ad) => {
+          ad.setAttribute('data-ad-loaded', 'true');
+          try {
+              (adsbygoogle = window.adsbygoogle || []).push({});
+          } catch (e) {
+              console.warn('AdSense load skipped:', e);
+          }
+      });
+  }
+  
+  function showPage(page) {
+      // Hide all pages
+      greetingPage.classList.remove('active');
+      joinRoomPage.classList.remove('active');
+      chatRoomPage.classList.remove('active');
+      
+      // Show the selected page
+      page.classList.add('active');
+      requestAnimationFrame(() => loadAdsInPage(page));
+  }
+  
+  function formatTimestamp(timestamp) {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  
+  function addMessage(messageObj, isOwnMessage = false) {
+      const { id, username, message, timestamp, replyTo } = messageObj;
+      
+      // Store message in map for reply functionality
+      messageMap.set(id, messageObj);
+      
+      const messageElement = document.createElement('div');
+      messageElement.classList.add('message');
+      messageElement.classList.add(isOwnMessage ? 'own-message' : 'other-message');
+      messageElement.dataset.messageId = id;
+      
+      // Add swipe hint icon
+      const swipeHint = document.createElement('div');
+      swipeHint.classList.add('swipe-hint');
+      swipeHint.innerHTML = '<i class="fas fa-reply"></i>';
+      messageElement.appendChild(swipeHint);
+      
+      const usernameElement = document.createElement('div');
+      usernameElement.classList.add('username');
+      usernameElement.textContent = username;
+      
+      // If this is a reply to another message, add the quote
+      if (replyTo && messageMap.has(replyTo)) {
+          const repliedMessage = messageMap.get(replyTo);
+          const quoteElement = document.createElement('div');
+          quoteElement.classList.add('reply-quote');
+          
+          const quoteUsername = document.createElement('div');
+          quoteUsername.classList.add('reply-quote-username');
+          quoteUsername.textContent = repliedMessage.username;
+          
+          const quoteText = document.createElement('div');
+          quoteText.textContent = repliedMessage.message.length > 50 
+              ? repliedMessage.message.substring(0, 50) + '...' 
+              : repliedMessage.message;
+          
+          quoteElement.appendChild(quoteUsername);
+          quoteElement.appendChild(quoteText);
+          messageElement.appendChild(quoteElement);
+      }
+      
+      messageElement.appendChild(usernameElement);
+      
+      const contentElement = document.createElement('div');
+      contentElement.classList.add('content');
+      contentElement.textContent = message;
+      messageElement.appendChild(contentElement);
+      
+      const timestampElement = document.createElement('div');
+      timestampElement.classList.add('timestamp');
+      timestampElement.textContent = formatTimestamp(timestamp);
+      messageElement.appendChild(timestampElement);
+      
+      chatMessages.appendChild(messageElement);
+      
+      // Set up Hammer.js for swipe gestures
+      if (typeof Hammer !== 'undefined') {
+          const hammer = new Hammer(messageElement);
+          hammer.on('swiperight', function(e) {
+              startReply(id);
+          });
+      }
+      
+      // Also detect touch start/end for visual feedback
+      messageElement.addEventListener('touchstart', function() {
+          this.classList.add('swiping');
+      });
+      
+      messageElement.addEventListener('touchend', function() {
+          this.classList.remove('swiping');
+      });
+      
+      // Auto-scroll to bottom
+      chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+  }
+  
+  function startReply(messageId) {
+      if (!messageMap.has(messageId)) return;
+      
+      const messageObj = messageMap.get(messageId);
+      replyingTo = messageId;
+      
+      // Show reply container
+      replyContainer.classList.add('active');
+      replyUsername.textContent = messageObj.username;
+      replyMessage.textContent = messageObj.message.length > 30 
+          ? messageObj.message.substring(0, 30) + '...' 
+          : messageObj.message;
+      
+      // Focus input
+      messageInput.focus();
+  }
+  
+  function cancelReply() {
+      replyingTo = null;
+      replyContainer.classList.remove('active');
+  }
+  
+  function addSystemMessage(message) {
+      const messageElement = document.createElement('div');
+      messageElement.classList.add('system-message');
+      messageElement.textContent = message;
+      
+      chatMessages.appendChild(messageElement);
+      
+      // Auto-scroll to bottom
+      chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+  }
+  
+  function sendMessage() {
+      const message = messageInput.value.trim();
+      
+      if (message && currentRoom) {
+          socket.emit('sendMessage', {
+              roomKey: currentRoom,
+              message,
+              replyTo: replyingTo
+          });
+          
+          messageInput.value = '';
+          messageInput.focus();
+          
+          // Clear reply state
+          if (replyingTo) {
+              cancelReply();
+          }
+      }
+  }
+  
+  function updateTypingIndicator() {
+      const users = Array.from(typingUsers);
+      let text = '';
+  
+      if (users.length === 1) {
+          text = `${users[0]} is typing...`;
+      } else if (users.length === 2) {
+          text = `${users[0]} and ${users[1]} are typing...`;
+      } else if (users.length > 2) {
+          text = `${users.length} people are typing...`;
+      }
+  
+      typingIndicator.textContent = text;
+  }
+  
+  // Theme Logic
+  function initTheme() {
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      updateThemeIcon(savedTheme);
+  }
+  
+  function toggleTheme() {
+      const currentTheme = document.documentElement.getAttribute('data-theme');
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+      updateThemeIcon(newTheme);
+  }
+  
+  function updateThemeIcon(theme) {
+      if (!themeToggle) return;
+      const icon = themeToggle.querySelector('i');
+      if (theme === 'dark') {
+          icon.classList.remove('fa-moon');
+          icon.classList.add('fa-sun');
+      } else {
+          icon.classList.remove('fa-sun');
+          icon.classList.add('fa-moon');
+      }
+  }
+  
+  if (themeToggle) {
+      themeToggle.addEventListener('click', toggleTheme);
+  }
+  
+  // Initialize theme
+  initTheme();
+  
+  // Event listeners
+  usernameDisplay.addEventListener('blur', () => {
+      const newUsername = usernameDisplay.textContent.trim();
+      if (newUsername && newUsername !== currentUsername) {
+          socket.emit('changeUsername', { newUsername });
+          currentUsername = newUsername; // Optimistic update
+      } else {
+          // Revert if empty or unchanged
+          usernameDisplay.textContent = currentUsername;
+      }
+  });
+  
+  usernameDisplay.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+          e.preventDefault(); // Prevent new line
+          usernameDisplay.blur(); // Trigger blur event to save
+      }
+  });
+  
+  createRoomBtn.addEventListener('click', () => {
+      socket.emit('createRoom');
+  });
+  
+  joinRoomBtn.addEventListener('click', () => {
+      showPage(joinRoomPage);
+      roomKeyInput.focus();
+  });
+  
+  joinSubmitBtn.addEventListener('click', () => {
+      const roomKey = roomKeyInput.value.trim();
+      
+      if (roomKey.length !== 6 || !/^\d+$/.test(roomKey)) {
+          joinErrorMessage.textContent = 'Please enter a valid 6-digit room key';
+          return;
+      }
+      
+      socket.emit('joinRoom', { roomKey });
+  });
+  
+  joinBackBtn.addEventListener('click', () => {
+      showPage(greetingPage);
+      joinErrorMessage.textContent = '';
+      roomKeyInput.value = '';
+  });
+  
+  closeRoomBtn.addEventListener('click', () => {
+      if (currentRoom) {
+          if (confirm('Are you sure you want to close this room? All users will be disconnected.')) {
+              socket.emit('closeRoom', { roomKey: currentRoom });
+          }
+      }
+  });
+  
+  cancelReplyBtn.addEventListener('click', () => {
+      cancelReply();
+  });
+  
+  sendMessageBtn.addEventListener('click', () => {
+      sendMessage();
+  });
+  
+  messageInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+          sendMessage();
+      } else {
+          // Emit typing event
+          if (currentRoom) {
+              socket.emit('typing', { roomKey: currentRoom });
+          }
+      }
+  });
+  
+  // Logic to stop typing after a delay
+  let typingTimeout = null;
+  messageInput.addEventListener('keyup', () => {
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => {
+          if (currentRoom) {
+              socket.emit('stopTyping', { roomKey: currentRoom });
+          }
+      }, 1500); // 1.5 seconds delay
+  });
+  
+  copyRoomKeyBtn.addEventListener('click', () => {
+      const inviteLink = `${window.location.origin}/?room=${currentRoom}`;
+      navigator.clipboard.writeText(inviteLink)
+          .then(() => {
+              alert('Invitation link copied to clipboard!');
+          })
+          .catch(err => {
+              console.error('Could not copy text: ', err);
+          });
+  });
+  
+  // Scroll to bottom button logic
+  scrollToBottomBtn.addEventListener('click', () => {
+      chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+  });
+  
+  chatMessages.addEventListener('scroll', () => {
+      // Show button if user is not at the bottom
+      const isAtBottom = chatMessages.scrollHeight - chatMessages.clientHeight <= chatMessages.scrollTop + 1; // +1 for tolerance
+      if (isAtBottom) {
+          scrollToBottomBtn.classList.remove('visible');
+      } else {
+          scrollToBottomBtn.classList.add('visible');
+      }
+  });
+  
+  // Socket.IO event handlers
+  socket.on('roomCreated', (data) => {
+      currentRoom = data.roomKey;
+      currentUsername = data.username;
+      isAdmin = data.isAdmin;
+      
+      roomKeyDisplay.textContent = currentRoom;
+      roomKeyInfo.textContent = currentRoom;
+      usernameDisplay.textContent = currentUsername;
+      userCountDisplay.textContent = data.userCount;
+      
+      // Show admin controls if user is admin
+      adminControls.style.display = isAdmin ? 'block' : 'none';
+      
+      // Reset message map
+      messageMap.clear();
+      
+      showPage(chatRoomPage);
+      messageInput.focus();
+  });
+  
+  socket.on('roomJoined', (data) => {
+      currentRoom = data.roomKey;
+      currentUsername = data.username;
+      isAdmin = data.isAdmin;
+      
+      roomKeyDisplay.textContent = currentRoom;
+      roomKeyInfo.textContent = currentRoom;
+      usernameDisplay.textContent = currentUsername;
+      userCountDisplay.textContent = data.userCount;
+      
+      // Show admin controls if user is admin
+      adminControls.style.display = isAdmin ? 'block' : 'none';
+      
+      // If this was a silent reconnect rejoin, don't wipe and replay the
+      // whole message history over what's already on screen.
+      if (isReconnecting) {
+          isReconnecting = false;
+      } else {
+          // Reset message map
+          messageMap.clear();
+  
+          // Load existing messages if any
+          if (data.messages && data.messages.length > 0) {
+              // Clear existing messages
+              while (chatMessages.firstChild) {
+                  if (chatMessages.firstChild.classList && chatMessages.firstChild.classList.contains('system-message')) {
+                      break;
+                  }
+                  chatMessages.removeChild(chatMessages.firstChild);
+              }
+              
+              // Add messages
+              data.messages.forEach(msg => {
+                  const isOwnMessage = msg.username === currentUsername;
+                  addMessage(msg, isOwnMessage);
+              });
+          }
+          
+          showPage(chatRoomPage);
+          messageInput.focus();
+          
+          // Clear join room form
+          joinErrorMessage.textContent = '';
+          roomKeyInput.value = '';
+      }
+  });
+  
+  socket.on('newMessage', (data) => {
+      const isOwnMessage = data.username === currentUsername;
+      addMessage(data, isOwnMessage);
+  });
+  
+  // Typing indicator handlers
+  const typingUsers = new Set();
+  
+  socket.on('userTyping', (data) => {
+      if (data.username !== currentUsername) {
+          typingUsers.add(data.username);
+          updateTypingIndicator();
+      }
+  });
+  
+  socket.on('userStopTyping', (data) => {
+      typingUsers.delete(data.username);
+      updateTypingIndicator();
+  });
+  
+  socket.on('userJoined', (data) => {
+      addSystemMessage(`${data.username} has joined the room`);
+      userCountDisplay.textContent = data.userCount;
+  });
+  
+  socket.on('userLeft', (data) => {
+      addSystemMessage(`${data.username} has left the room`);
+      userCountDisplay.textContent = data.userCount;
+  });
+  
+  socket.on('systemMessage', (data) => {
+      addSystemMessage(data.message);
+  });
+  
+  socket.on('adminChanged', (data) => {
+      isAdmin = (socket.id === data.newAdminId);
+      adminControls.style.display = isAdmin ? 'block' : 'none';
+      addSystemMessage(data.message);
+  });
+  
+  socket.on('roomClosed', (data) => {
+      alert(data.message);
+      showPage(greetingPage);
+      
+      // Reset state
+      currentRoom = null;
+      currentUsername = null;
+      isAdmin = false;
+      messageMap.clear();
+      
+      // Clear chat messages
+      while (chatMessages.firstChild) {
+          if (chatMessages.firstChild.classList && chatMessages.firstChild.classList.contains('system-message')) {
+              break;
+          }
+          chatMessages.removeChild(chatMessages.firstChild);
+      }
+  });
+  
+  socket.on('error', (data) => {
+      if (joinRoomPage.classList.contains('active')) {
+          joinErrorMessage.textContent = data.message;
+      } else {
+          alert(data.message);
+      }
+  });
+  
+  // Reconnect handling: Socket.IO will automatically try to reconnect the
+  // underlying transport after a drop (network blip, mobile tab suspend,
+  // brief server hiccup). When that happens we get a NEW socket.id, so the
+  // server no longer has us listed in room.users. Silently re-send joinRoom
+  // for whatever room we were in so we're re-added without losing our place
+  // or seeing a jarring "room closed" message.
+  socket.on('reconnect', () => {
+      if (currentRoom) {
+          isReconnecting = true;
+          socket.emit('joinRoom', { roomKey: currentRoom });
+      }
+  });
+  
+  // Initialize
+  const urlParams = new URLSearchParams(window.location.search);
+  const roomKeyFromUrl = urlParams.get('room');
+  
+  if (roomKeyFromUrl && /^\d{6}$/.test(roomKeyFromUrl)) {
+      // Remove the room parameter from the URL to prevent re-joining on refresh
+      history.replaceState(null, '', window.location.pathname);
+  
+      // Pre-fill the join room input and show the join page
+      roomKeyInput.value = roomKeyFromUrl;
+      showPage(joinRoomPage);
+      joinSubmitBtn.click(); // Automatically attempt to join
+  } else {
+      showPage(greetingPage);
+  }
+  
