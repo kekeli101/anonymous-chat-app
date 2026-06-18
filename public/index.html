@@ -16,17 +16,44 @@
     <div id="greeting-page" class="page active">
         <div class="container">
             <h1>Anonymous Chat</h1>
-            <p>Connect and chat with people anonymously in real-time</p>
-            <div class="button-group create-options">
+            <p class="hero-text">Chat anonymously in real time. Create a public room, a private room, or join one below.</p>
+
+            <div class="section-card create-public-form">
+                <h2 class="section-title"><i class="fas fa-globe"></i> Public room</h2>
+                <p class="hint-text">Give your room a name. Anyone can see and join it from the list below.</p>
+                <label for="public-room-name">Room name</label>
+                <input
+                    type="text"
+                    id="public-room-name"
+                    placeholder="e.g. Study group, Gaming lounge..."
+                    maxlength="50"
+                    autocomplete="off"
+                >
+                <p class="field-error hidden" id="public-room-error"></p>
                 <button id="create-public-btn" class="btn primary">
                     <i class="fas fa-globe"></i> Create Public Room
                 </button>
-                <button id="create-private-btn" class="btn primary">
-                    <i class="fas fa-lock"></i> Create Private Room
-                </button>
-                <button id="join-room-btn" class="btn secondary">
-                    <i class="fas fa-door-open"></i> Join Private Room
-                </button>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><i class="fas fa-lock"></i> Private room</h2>
+                <p class="hint-text">Only people with your 6-digit key can join a private room.</p>
+                <div class="button-group create-options">
+                    <button id="create-private-btn" class="btn primary">
+                        <i class="fas fa-lock"></i> Create Private Room
+                    </button>
+                    <button id="join-room-btn" class="btn secondary">
+                        <i class="fas fa-door-open"></i> Join Private Room
+                    </button>
+                </div>
+            </div>
+
+            <div class="section-card public-rooms-section">
+                <h2 class="section-title"><i class="fas fa-list"></i> Join a public room</h2>
+                <p class="hint-text">Tap a room to join instantly.</p>
+                <div id="public-rooms-list" class="public-rooms-list">
+                    <p class="public-rooms-empty">No public rooms yet. Be the first to create one!</p>
+                </div>
             </div>
             <div class="ad-container ad-container--landing">
                 <ins class="adsbygoogle"
@@ -42,8 +69,8 @@
     <!-- Join Room Page (private rooms only) -->
     <div id="join-room-page" class="page">
         <div class="container">
-            <h1>Join a Room</h1>
-            <p>Enter the 6-digit room key to join a private chat</p>
+            <h1>Join Private Room</h1>
+            <p class="hero-text">Enter the 6-digit key shared by the room creator.</p>
             <div class="input-group">
                 <input 
                     type="text" 
@@ -80,14 +107,21 @@
             <!-- Chat Header -->
             <div class="chat-header">
                 <div class="room-info">
-                    <h2><i class="fas fa-hashtag"></i> Room <span id="room-key-display"></span></h2>
-                    <p><i class="fas fa-user-circle"></i> <span id="username-wrapper"><span id="username-display" contenteditable="true" title="Click to edit your username"></span><span id="edit-icon"><i class="fas fa-edit"></i></span></span></p>
+                    <button id="leave-room-btn" class="btn-icon back-btn" title="Leave room" aria-label="Leave room">
+                        <i class="fas fa-arrow-left"></i>
+                        <span class="back-label">Back</span>
+                    </button>
+                    <div>
+                        <h2><i class="fas fa-hashtag"></i> <span id="room-name-display">Room</span></h2>
+                        <p class="room-key-line"><i class="fas fa-key"></i> <span id="room-key-display"></span></p>
+                        <p><i class="fas fa-user-circle"></i> <span id="username-wrapper"><span id="username-display" contenteditable="true" title="Click to edit your username"></span><span id="edit-icon"><i class="fas fa-edit"></i></span></span></p>
+                    </div>
                 </div>
                 <div class="header-actions">
                     <button id="theme-toggle" class="btn-icon theme-toggle" title="Toggle Dark Mode">
                         <i class="fas fa-moon"></i>
                     </button>
-                    <button id="admin-key-btn" class="btn-icon" title="Unlock admin with management key">
+                    <button id="admin-key-btn" class="btn-icon" title="Unlock admin with delete code">
                         <i class="fas fa-lock"></i>
                     </button>
                     <button id="members-btn" class="btn-icon" title="Members">
@@ -118,7 +152,7 @@
             <!-- Chat Messages Area -->
             <div class="chat-messages" id="chat-messages">
                 <div class="system-message">
-                    <i class="fas fa-info-circle"></i> Welcome to the chat room! You can now start chatting anonymously.
+                    <i class="fas fa-info-circle"></i> Welcome! Type a message below to start chatting. Swipe right on a message to reply.
                 </div>
             </div>
 
@@ -165,6 +199,60 @@
                 <button id="send-message-btn" class="send-btn" title="Send message">
                     <i class="fas fa-paper-plane"></i>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notifications -->
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+    <!-- Modal: room created (save delete PIN) -->
+    <div id="room-created-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal-card">
+            <h2><i class="fas fa-check-circle"></i> Room created!</h2>
+            <p class="modal-text">Save this <strong>6-digit delete PIN</strong>. You will need it to delete the room later. We also saved it in your browser.</p>
+            <div class="pin-display" id="created-pin-display">000000</div>
+            <p class="modal-subtext">Room: <span id="created-room-name-label"></span></p>
+            <div class="modal-actions">
+                <button type="button" class="btn secondary" id="copy-created-pin-btn"><i class="fas fa-copy"></i> Copy PIN</button>
+                <button type="button" class="btn primary" id="enter-created-room-btn">Enter room</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: enter PIN (delete / admin) -->
+    <div id="pin-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal-card">
+            <h2 id="pin-modal-title">Enter delete PIN</h2>
+            <p class="modal-text" id="pin-modal-desc">Enter the 6-digit PIN for this room.</p>
+            <input type="text" id="pin-modal-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="6-digit PIN" autocomplete="off">
+            <p class="field-error hidden" id="pin-modal-error"></p>
+            <div class="modal-actions">
+                <button type="button" class="btn secondary" id="pin-modal-cancel">Cancel</button>
+                <button type="button" class="btn primary" id="pin-modal-confirm">Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: confirm delete -->
+    <div id="confirm-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal-card">
+            <h2><i class="fas fa-triangle-exclamation"></i> Delete room?</h2>
+            <p class="modal-text">This removes the room for everyone. This cannot be undone.</p>
+            <div class="modal-actions">
+                <button type="button" class="btn secondary" id="confirm-modal-cancel">Cancel</button>
+                <button type="button" class="btn danger" id="confirm-modal-ok">Delete room</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: simple message -->
+    <div id="alert-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal-card">
+            <h2 id="alert-modal-title">Notice</h2>
+            <p class="modal-text" id="alert-modal-message"></p>
+            <div class="modal-actions">
+                <button type="button" class="btn primary" id="alert-modal-ok">OK</button>
             </div>
         </div>
     </div>

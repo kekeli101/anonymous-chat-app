@@ -24,9 +24,10 @@ const io = socketIo(server, {
 // Store active rooms
 // roomKey -> {
 //   type: 'public' | 'private',
-//   adminKey: string,            // secret management key: remove users / delete room
-//   creator: socketId,           // informational only
-//   admins: Set<socketId>,       // sockets currently authenticated as admin
+//   name: string | null,         // public rooms only
+//   deleteCode: string,          // 6-digit code to delete the room
+//   creator: socketId,
+//   admins: Set<socketId>,
 //   users: Map<socketId, username>,
 //   createdAt: Date,
 //   lastActivity: Date,
@@ -63,7 +64,9 @@ if (ROOM_INACTIVITY_LIMIT_MS) {
     for (const [roomKey, room] of activeRooms.entries()) {
       if (now - new Date(room.lastActivity).getTime() > ROOM_INACTIVITY_LIMIT_MS) {
         io.to(roomKey).emit('roomClosed', { message: 'Room closed due to long inactivity' });
+        const wasPublic = room.type === 'public';
         activeRooms.delete(roomKey);
+        if (wasPublic) broadcastPublicRooms();
         console.log(`Room removed (inactivity): ${roomKey}`);
       }
     }
@@ -72,13 +75,9 @@ if (ROOM_INACTIVITY_LIMIT_MS) {
 
 // --- Key / id generators -----------------------------------------------------
 
-// 6-digit numeric key for PRIVATE rooms (the secret you share to let people in)
-function generatePrivateKey() {
-  let key;
-  do {
-    key = Math.floor(100000 + Math.random() * 900000).toString();
-  } while (activeRooms.has(key));
-  return key;
+// 6-digit numeric delete code (save this to delete the room later)
+function generateDeleteCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 // Longer, link-friendly id for PUBLIC rooms (shared openly via link)
@@ -90,11 +89,49 @@ function generatePublicId() {
   return id;
 }
 
-// Secret management key returned to the creator. NOT needed to join — only to
-// remove users or delete the room. This is what keeps a room manageable even
-// after the creator has left.
-function generateAdminKey() {
-  return crypto.randomBytes(16).toString('hex'); // 32 hex chars
+// 6-digit numeric key for PRIVATE rooms (the secret you share to let people in)
+function generatePrivateKey() {
+  let key;
+  do {
+    key = Math.floor(100000 + Math.random() * 900000).toString();
+  } while (activeRooms.has(key));
+  return key;
+}
+
+function getPublicRoomsList() {
+  const rooms = [];
+  for (const [roomKey, room] of activeRooms.entries()) {
+    if (room.type === 'public') {
+      rooms.push({
+        roomKey,
+        name: room.name,
+        userCount: room.users.size,
+        createdAt: room.createdAt,
+      });
+    }
+  }
+  return rooms.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+function broadcastPublicRooms() {
+  io.emit('publicRoomsUpdated', { rooms: getPublicRoomsList() });
+}
+
+function removeUserFromRoom(socket, roomKey, room, leaveSocket = true) {
+  if (!room.users.has(socket.id)) return;
+
+  const username = room.users.get(socket.id);
+  room.users.delete(socket.id);
+  room.admins.delete(socket.id);
+  if (leaveSocket) socket.leave(roomKey);
+
+  socket.to(roomKey).emit('userLeft', {
+    username,
+    timestamp: new Date(),
+    userCount: room.users.size,
+  });
+  emitUserList(roomKey, room);
+  console.log(`User left ${roomKey}: ${username} (${socket.id})`);
 }
 
 // Generate a random username
@@ -126,8 +163,8 @@ function emitUserList(roomKey, room) {
   });
 }
 
-function isAuthorisedAdmin(room, socketId, adminKey) {
-  return room.admins.has(socketId) || (!!adminKey && adminKey === room.adminKey);
+function isAuthorisedAdmin(room, socketId, deleteCode) {
+  return room.admins.has(socketId) || (!!deleteCode && deleteCode === room.deleteCode);
 }
 
 // --- Socket.IO ---------------------------------------------------------------
@@ -138,13 +175,21 @@ io.on('connection', (socket) => {
   // Create a new room (public or private)
   socket.on('createRoom', (data = {}) => {
     const type = data.type === 'public' ? 'public' : 'private';
+    const roomName = (data.name || '').toString().trim().slice(0, 50);
+
+    if (type === 'public' && !roomName) {
+      socket.emit('error', { message: 'Please enter a room name before creating' });
+      return;
+    }
+
     const roomKey = type === 'public' ? generatePublicId() : generatePrivateKey();
-    const adminKey = generateAdminKey();
+    const deleteCode = generateDeleteCode();
     const username = generateUsername();
 
     const room = {
       type,
-      adminKey,
+      name: type === 'public' ? roomName : null,
+      deleteCode,
       creator: socket.id,
       admins: new Set([socket.id]),
       users: new Map([[socket.id, username]]),
@@ -159,19 +204,24 @@ io.on('connection', (socket) => {
     socket.emit('roomCreated', {
       roomKey,
       type,
-      adminKey,        // creator stores this to manage the room later
+      name: room.name,
+      deleteCode,
       username,
       isAdmin: true,
       userCount: 1
     });
 
-    console.log(`${type} room created: ${roomKey} by ${username} (${socket.id})`);
+    if (type === 'public') {
+      broadcastPublicRooms();
+    }
+
+    console.log(`${type} room created: ${roomKey} (${roomName || 'private'}) by ${username} (${socket.id})`);
   });
 
   // Join an existing room (public link or private key — both look up by id)
   socket.on('joinRoom', (data) => {
     const { roomKey } = data;
-    const adminKey = data && data.adminKey ? data.adminKey : null;
+    const deleteCode = data && data.deleteCode ? data.deleteCode : null;
 
     if (!activeRooms.has(roomKey)) {
       socket.emit('error', { message: 'Room not found' });
@@ -185,9 +235,8 @@ io.on('connection', (socket) => {
     room.lastActivity = new Date();
     socket.join(roomKey);
 
-    // Returning creator / moderator may pass the management key to regain admin
     let isAdmin = false;
-    if (adminKey && adminKey === room.adminKey) {
+    if (deleteCode && deleteCode === room.deleteCode) {
       room.admins.add(socket.id);
       isAdmin = true;
     }
@@ -195,6 +244,7 @@ io.on('connection', (socket) => {
     socket.emit('roomJoined', {
       roomKey,
       type: room.type,
+      name: room.name,
       username,
       isAdmin,
       userCount: room.users.size,
@@ -213,9 +263,18 @@ io.on('connection', (socket) => {
     console.log(`User joined ${room.type} room ${roomKey} as ${username} (${socket.id})`);
   });
 
-  // Unlock admin controls by supplying the management key after joining
+  // Leave a room without deleting it
+  socket.on('leaveRoom', (data) => {
+    const { roomKey } = data || {};
+    const room = activeRooms.get(roomKey);
+    if (!room) return;
+    removeUserFromRoom(socket, roomKey, room);
+    socket.emit('leftRoom', { roomKey });
+  });
+
+  // Unlock admin controls by supplying the delete code after joining
   socket.on('authenticateAdmin', (data) => {
-    const { roomKey, adminKey } = data || {};
+    const { roomKey, deleteCode } = data || {};
     const room = activeRooms.get(roomKey);
 
     if (!room) {
@@ -227,7 +286,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (adminKey && adminKey === room.adminKey) {
+    if (deleteCode && deleteCode === room.deleteCode) {
       room.admins.add(socket.id);
       socket.emit('adminAuthenticated', {
         success: true,
@@ -235,7 +294,7 @@ io.on('connection', (socket) => {
         userCount: room.users.size
       });
     } else {
-      socket.emit('adminAuthenticated', { success: false, message: 'Invalid management key' });
+      socket.emit('adminAuthenticated', { success: false, message: 'Invalid delete code' });
     }
   });
 
@@ -316,17 +375,17 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Remove a user from the room (requires the management key)
+  // Remove a user from the room (requires the delete code)
   socket.on('removeUser', (data) => {
-    const { roomKey, adminKey, targetId } = data || {};
+    const { roomKey, deleteCode, targetId } = data || {};
     const room = activeRooms.get(roomKey);
 
     if (!room) {
       socket.emit('error', { message: 'Room not found' });
       return;
     }
-    if (!isAuthorisedAdmin(room, socket.id, adminKey)) {
-      socket.emit('error', { message: 'Invalid management key' });
+    if (!isAuthorisedAdmin(room, socket.id, deleteCode)) {
+      socket.emit('error', { message: 'Invalid delete code' });
       return;
     }
     if (!room.users.has(targetId)) {
@@ -352,24 +411,27 @@ io.on('connection', (socket) => {
     console.log(`User ${targetUsername} removed from ${roomKey}`);
   });
 
-  // Delete the room entirely (requires the management key)
+  // Delete the room entirely (requires the delete code)
   socket.on('deleteRoom', (data) => {
-    const { roomKey, adminKey } = data || {};
+    const { roomKey, deleteCode } = data || {};
     const room = activeRooms.get(roomKey);
 
     if (!room) {
       socket.emit('error', { message: 'Room not found' });
       return;
     }
-    if (!isAuthorisedAdmin(room, socket.id, adminKey)) {
+    if (!isAuthorisedAdmin(room, socket.id, deleteCode)) {
       socket.emit('error', {
-        message: 'Invalid management key — only someone with the key can delete this room'
+        message: 'Invalid delete code — only someone with the code can delete this room'
       });
       return;
     }
 
-    io.to(roomKey).emit('roomClosed', { message: 'This room has been deleted by an admin' });
+    io.to(roomKey).emit('roomClosed', { message: 'This room has been deleted' });
     activeRooms.delete(roomKey);
+    if (room.type === 'public') {
+      broadcastPublicRooms();
+    }
     console.log(`Room deleted: ${roomKey}`);
   });
 
@@ -379,27 +441,17 @@ io.on('connection', (socket) => {
 
     for (const [roomKey, room] of activeRooms.entries()) {
       if (room.users.has(socket.id)) {
-        const username = room.users.get(socket.id);
-        room.users.delete(socket.id);
-        room.admins.delete(socket.id);
-
-        socket.to(roomKey).emit('userLeft', {
-          username,
-          timestamp: new Date(),
-          userCount: room.users.size
-        });
-        emitUserList(roomKey, room);
-
-        // Room is intentionally NOT deleted, even when empty. It only goes away
-        // when someone deletes it with the management key (or, optionally, after
-        // long inactivity if ROOM_INACTIVITY_LIMIT_MS is set).
-        console.log(`User left ${roomKey}: ${username} (${socket.id})`);
+        removeUserFromRoom(socket, roomKey, room, false);
       }
     }
   });
 });
 
 // Routes
+app.get('/api/public-rooms', (req, res) => {
+  res.json({ rooms: getPublicRoomsList() });
+});
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });

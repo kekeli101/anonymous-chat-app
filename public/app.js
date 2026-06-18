@@ -10,6 +10,8 @@ const socket = io({
   
   // Greeting buttons
   const createPublicBtn = document.getElementById('create-public-btn');
+  const publicRoomNameInput = document.getElementById('public-room-name');
+  const publicRoomsList = document.getElementById('public-rooms-list');
   const createPrivateBtn = document.getElementById('create-private-btn');
   const joinRoomBtn = document.getElementById('join-room-btn');
   
@@ -21,11 +23,13 @@ const socket = io({
   
   // Chat controls
   const deleteRoomBtn = document.getElementById('delete-room-btn');
+  const leaveRoomBtn = document.getElementById('leave-room-btn');
   const sendMessageBtn = document.getElementById('send-message-btn');
   const messageInput = document.getElementById('message-input');
   const chatMessages = document.getElementById('chat-messages');
   
   const roomKeyDisplay = document.getElementById('room-key-display');
+  const roomNameDisplay = document.getElementById('room-name-display');
   const usernameDisplay = document.getElementById('username-display');
   const userCountDisplay = document.getElementById('user-count-display');
   const adminControls = document.getElementById('admin-controls');
@@ -47,30 +51,147 @@ const socket = io({
   const typingIndicator = document.getElementById('typing-indicator');
   const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
   const themeToggle = document.getElementById('theme-toggle');
+  const publicRoomError = document.getElementById('public-room-error');
+  const toastContainer = document.getElementById('toast-container');
+
+  const roomCreatedModal = document.getElementById('room-created-modal');
+  const createdPinDisplay = document.getElementById('created-pin-display');
+  const createdRoomNameLabel = document.getElementById('created-room-name-label');
+  const copyCreatedPinBtn = document.getElementById('copy-created-pin-btn');
+  const enterCreatedRoomBtn = document.getElementById('enter-created-room-btn');
+
+  const pinModal = document.getElementById('pin-modal');
+  const pinModalTitle = document.getElementById('pin-modal-title');
+  const pinModalDesc = document.getElementById('pin-modal-desc');
+  const pinModalInput = document.getElementById('pin-modal-input');
+  const pinModalError = document.getElementById('pin-modal-error');
+  const pinModalCancel = document.getElementById('pin-modal-cancel');
+  const pinModalConfirm = document.getElementById('pin-modal-confirm');
+
+  const confirmModal = document.getElementById('confirm-modal');
+  const confirmModalCancel = document.getElementById('confirm-modal-cancel');
+  const confirmModalOk = document.getElementById('confirm-modal-ok');
+
+  const alertModal = document.getElementById('alert-modal');
+  const alertModalTitle = document.getElementById('alert-modal-title');
+  const alertModalMessage = document.getElementById('alert-modal-message');
+  const alertModalOk = document.getElementById('alert-modal-ok');
   
   // App state
   let currentRoom = null;
+  let currentRoomName = null;
   let currentType = null;          // 'public' | 'private'
   let currentUsername = null;
-  let currentAdminKey = null;      // management key (creator / authenticated admins)
-  let pendingAdminKey = null;      // key being verified via authenticateAdmin
+  let currentDeleteCode = null;    // 6-digit code to delete the room
+  let pendingDeleteCode = null;
   let isAdmin = false;
   let replyingTo = null;
   let messageMap = new Map();
   let roomUsers = [];              // [{ id, username }]
   let isReconnecting = false;
+  let pendingRoomEntry = null;
+  let pinModalCallback = null;
+  let confirmModalCallback = null;
   
   const typingUsers = new Set();
+
+  function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    toastContainer.appendChild(toast);
+    setTimeout(() => toast.remove(), 3200);
+  }
+
+  function showAlert(title, message, onOk) {
+    alertModalTitle.textContent = title;
+    alertModalMessage.textContent = message;
+    alertModal.classList.remove('hidden');
+    alertModalOk.onclick = () => {
+      alertModal.classList.add('hidden');
+      if (onOk) onOk();
+    };
+  }
+
+  function openPinModal({ title, description, onConfirm }) {
+    pinModalTitle.textContent = title;
+    pinModalDesc.textContent = description;
+    pinModalInput.value = '';
+    pinModalError.classList.add('hidden');
+    pinModal.classList.remove('hidden');
+    pinModalCallback = onConfirm;
+    setTimeout(() => pinModalInput.focus(), 100);
+  }
+
+  function closePinModal() {
+    pinModal.classList.add('hidden');
+    pinModalCallback = null;
+  }
+
+  function openConfirmModal({ title, message, onConfirm }) {
+    const titleEl = confirmModal.querySelector('h2');
+    const messageEl = confirmModal.querySelector('.modal-text');
+    if (titleEl) titleEl.innerHTML = title || '<i class="fas fa-triangle-exclamation"></i> Are you sure?';
+    if (messageEl) messageEl.textContent = message || 'Please confirm this action.';
+    confirmModal.classList.remove('hidden');
+    confirmModalCallback = onConfirm;
+  }
+
+  function closeConfirmModal() {
+    confirmModal.classList.add('hidden');
+    confirmModalCallback = null;
+  }
+
+  function enterRoomFromPending() {
+    if (!pendingRoomEntry) return;
+    const data = pendingRoomEntry;
+    pendingRoomEntry = null;
+
+    currentRoom = data.roomKey;
+    currentRoomName = data.name || null;
+    currentType = data.type;
+    currentUsername = data.username;
+    currentDeleteCode = data.deleteCode;
+    isAdmin = data.isAdmin;
+    roomUsers = [{ id: socket.id, username: currentUsername }];
+
+    updateRoomHeader();
+    usernameDisplay.textContent = currentUsername;
+    userCountDisplay.textContent = data.userCount;
+    updateAdminUi();
+    if (currentDeleteCode) storeDeleteCode(currentRoom, currentDeleteCode);
+
+    messageMap.clear();
+    showPage(chatRoomPage);
+    clearChatMessages();
+    addRoomInfoCard();
+    renderMembers();
+    messageInput.focus();
+  }
+
+  function setButtonLoading(button, loading, defaultHtml) {
+    if (!button) return;
+    if (loading) {
+      button.classList.add('loading');
+      button.disabled = true;
+      button.dataset.defaultHtml = button.innerHTML;
+      button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Please wait...';
+    } else {
+      button.classList.remove('loading');
+      button.disabled = false;
+      button.innerHTML = button.dataset.defaultHtml || defaultHtml;
+    }
+  }
   
-  // --- Admin key persistence (convenience; you should also store it yourself) ---
-  function storeAdminKey(roomKey, adminKey) {
-    try { localStorage.setItem('adminKey:' + roomKey, adminKey); } catch (e) {}
+  // --- Delete code persistence (store it — you need it to delete the room) ---
+  function storeDeleteCode(roomKey, deleteCode) {
+    try { localStorage.setItem('deleteCode:' + roomKey, deleteCode); } catch (e) {}
   }
-  function getStoredAdminKey(roomKey) {
-    try { return localStorage.getItem('adminKey:' + roomKey); } catch (e) { return null; }
+  function getStoredDeleteCode(roomKey) {
+    try { return localStorage.getItem('deleteCode:' + roomKey); } catch (e) { return null; }
   }
-  function clearStoredAdminKey(roomKey) {
-    try { localStorage.removeItem('adminKey:' + roomKey); } catch (e) {}
+  function clearStoredDeleteCode(roomKey) {
+    try { localStorage.removeItem('deleteCode:' + roomKey); } catch (e) {}
   }
   
   // --- Helpers -----------------------------------------------------------------
@@ -104,7 +225,58 @@ const socket = io({
   }
   
   function updateRoomHeader() {
-    roomKeyDisplay.textContent = currentType === 'public' ? 'Public' : currentRoom;
+    if (currentType === 'public') {
+      roomNameDisplay.textContent = currentRoomName || 'Public Room';
+      roomKeyDisplay.textContent = `ID: ${currentRoom}`;
+    } else {
+      roomNameDisplay.textContent = 'Private Room';
+      roomKeyDisplay.textContent = `Key: ${currentRoom}`;
+    }
+  }
+
+  async function loadPublicRooms() {
+    try {
+      const response = await fetch('/api/public-rooms');
+      const data = await response.json();
+      renderPublicRooms(data.rooms || []);
+    } catch (error) {
+      console.warn('Could not load public rooms', error);
+    }
+  }
+
+  function renderPublicRooms(rooms) {
+    publicRoomsList.innerHTML = '';
+
+    if (!rooms.length) {
+      publicRoomsList.innerHTML = '<p class="public-rooms-empty">No public rooms yet. Create one above.</p>';
+      return;
+    }
+
+    rooms.forEach((room) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'public-room-item';
+      item.innerHTML = `
+        <span class="public-room-name">${escapeHtml(room.name)}</span>
+        <span class="public-room-meta">${room.userCount} online</span>
+      `;
+      item.addEventListener('click', () => {
+        socket.emit('joinRoom', {
+          roomKey: room.roomKey,
+          deleteCode: getStoredDeleteCode(room.roomKey),
+        });
+      });
+      publicRoomsList.appendChild(item);
+    });
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
   }
   
   function updateAdminUi() {
@@ -123,10 +295,11 @@ const socket = io({
   
   function resetToGreeting() {
     currentRoom = null;
+    currentRoomName = null;
     currentType = null;
     currentUsername = null;
-    currentAdminKey = null;
-    pendingAdminKey = null;
+    currentDeleteCode = null;
+    pendingDeleteCode = null;
     isAdmin = false;
     roomUsers = [];
     replyingTo = null;
@@ -137,6 +310,7 @@ const socket = io({
     membersPanel.classList.remove('active');
     clearChatMessages();
     showPage(greetingPage);
+    loadPublicRooms();
   }
   
   // Info card shown when you create or join a room (invite link + keys)
@@ -157,10 +331,10 @@ const socket = io({
     html += `<div><i class="fas fa-link"></i> Invite link: ` +
       `<button class="btn-icon copy-btn" data-copy="${link}" title="Copy invite link"><i class="fas fa-copy"></i> Copy link</button></div>`;
   
-    if (currentAdminKey) {
-      html += `<div class="admin-key-warning"><i class="fas fa-shield-halved"></i> Save your management key — it's the only way to remove people or delete this room: ` +
-        `<code>${currentAdminKey}</code> ` +
-        `<button class="btn-icon copy-btn" data-copy="${currentAdminKey}" title="Copy management key"><i class="fas fa-copy"></i></button></div>`;
+    if (currentDeleteCode) {
+      html += `<div class="admin-key-warning"><i class="fas fa-shield-halved"></i> Save your 6-digit delete code — you need it to delete this room: ` +
+        `<code>${currentDeleteCode}</code> ` +
+        `<button class="btn-icon copy-btn" data-copy="${currentDeleteCode}" title="Copy delete code"><i class="fas fa-copy"></i></button></div>`;
     }
   
     card.innerHTML = html;
@@ -171,9 +345,10 @@ const socket = io({
         navigator.clipboard.writeText(btn.dataset.copy)
           .then(() => {
             btn.classList.add('copied');
+            showToast('Copied to clipboard', 'success');
             setTimeout(() => btn.classList.remove('copied'), 1200);
           })
-          .catch((err) => console.error('Copy failed', err));
+          .catch(() => showToast('Could not copy. Please copy manually.', 'error'));
       });
     });
   }
@@ -195,13 +370,17 @@ const socket = io({
         removeBtn.title = 'Remove user';
         removeBtn.innerHTML = '<i class="fas fa-user-slash"></i>';
         removeBtn.addEventListener('click', () => {
-          if (confirm(`Remove ${u.username} from the room?`)) {
-            socket.emit('removeUser', {
-              roomKey: currentRoom,
-              adminKey: currentAdminKey,
-              targetId: u.id
-            });
-          }
+          openConfirmModal({
+            title: '<i class="fas fa-user-slash"></i> Remove user?',
+            message: `Remove ${u.username} from this room?`,
+            onConfirm: () => {
+              socket.emit('removeUser', {
+                roomKey: currentRoom,
+                deleteCode: currentDeleteCode,
+                targetId: u.id
+              });
+            },
+          });
         });
         item.appendChild(removeBtn);
       }
@@ -378,10 +557,27 @@ const socket = io({
   });
   
   createPublicBtn.addEventListener('click', () => {
-    socket.emit('createRoom', { type: 'public' });
+    const roomName = publicRoomNameInput.value.trim();
+    publicRoomError.classList.add('hidden');
+    if (!roomName) {
+      publicRoomError.textContent = 'Please enter a room name first.';
+      publicRoomError.classList.remove('hidden');
+      publicRoomNameInput.focus();
+      return;
+    }
+    setButtonLoading(createPublicBtn, true, '<i class="fas fa-globe"></i> Create Public Room');
+    socket.emit('createRoom', { type: 'public', name: roomName });
+  });
+
+  publicRoomNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      createPublicBtn.click();
+    }
   });
   
   createPrivateBtn.addEventListener('click', () => {
+    setButtonLoading(createPrivateBtn, true, '<i class="fas fa-lock"></i> Create Private Room');
     socket.emit('createRoom', { type: 'private' });
   });
   
@@ -393,10 +589,16 @@ const socket = io({
   joinSubmitBtn.addEventListener('click', () => {
     const roomKey = roomKeyInput.value.trim();
     if (roomKey.length !== 6 || !/^\d+$/.test(roomKey)) {
-      joinErrorMessage.textContent = 'Please enter a valid 6-digit room key';
+      joinErrorMessage.textContent = 'Please enter a valid 6-digit room key.';
       return;
     }
-    socket.emit('joinRoom', { roomKey, adminKey: getStoredAdminKey(roomKey) });
+    joinErrorMessage.textContent = '';
+    setButtonLoading(joinSubmitBtn, true, '<i class="fas fa-sign-in-alt"></i> Join');
+    socket.emit('joinRoom', { roomKey, deleteCode: getStoredDeleteCode(roomKey) });
+  });
+
+  roomKeyInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') joinSubmitBtn.click();
   });
   
   joinBackBtn.addEventListener('click', () => {
@@ -405,11 +607,65 @@ const socket = io({
     roomKeyInput.value = '';
   });
   
+  leaveRoomBtn.addEventListener('click', () => {
+    if (!currentRoom) return;
+    socket.emit('leaveRoom', { roomKey: currentRoom });
+    showToast('You left the room', 'success');
+    resetToGreeting();
+  });
+
   deleteRoomBtn.addEventListener('click', () => {
     if (!currentRoom) return;
-    if (confirm('Delete this room for everyone? This cannot be undone.')) {
-      socket.emit('deleteRoom', { roomKey: currentRoom, adminKey: currentAdminKey });
+    openPinModal({
+      title: 'Delete room',
+      description: 'Enter your 6-digit delete PIN to continue.',
+      onConfirm: (code) => {
+        openConfirmModal({
+          title: '<i class="fas fa-triangle-exclamation"></i> Delete room?',
+          message: 'This removes the room for everyone. This cannot be undone.',
+          onConfirm: () => {
+            socket.emit('deleteRoom', { roomKey: currentRoom, deleteCode: code });
+          },
+        });
+      },
+    });
+  });
+
+  pinModalCancel.addEventListener('click', closePinModal);
+  pinModalConfirm.addEventListener('click', () => {
+    const code = pinModalInput.value.trim();
+    if (!/^\d{6}$/.test(code)) {
+      pinModalError.textContent = 'Please enter a valid 6-digit PIN.';
+      pinModalError.classList.remove('hidden');
+      return;
     }
+    pinModalError.classList.add('hidden');
+    const cb = pinModalCallback;
+    closePinModal();
+    if (cb) cb(code);
+  });
+
+  pinModalInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') pinModalConfirm.click();
+  });
+
+  confirmModalCancel.addEventListener('click', closeConfirmModal);
+  confirmModalOk.addEventListener('click', () => {
+    const cb = confirmModalCallback;
+    closeConfirmModal();
+    if (cb) cb();
+  });
+
+  copyCreatedPinBtn.addEventListener('click', () => {
+    const pin = createdPinDisplay.textContent;
+    navigator.clipboard.writeText(pin)
+      .then(() => showToast('Delete PIN copied', 'success'))
+      .catch(() => showToast('Could not copy PIN', 'error'));
+  });
+
+  enterCreatedRoomBtn.addEventListener('click', () => {
+    roomCreatedModal.classList.add('hidden');
+    enterRoomFromPending();
   });
   
   cancelReplyBtn.addEventListener('click', cancelReply);
@@ -423,11 +679,14 @@ const socket = io({
   });
   
   adminKeyBtn.addEventListener('click', () => {
-    const key = prompt('Enter the management key for this room to unlock admin controls:');
-    if (key && key.trim()) {
-      pendingAdminKey = key.trim();
-      socket.emit('authenticateAdmin', { roomKey: currentRoom, adminKey: pendingAdminKey });
-    }
+    openPinModal({
+      title: 'Admin access',
+      description: 'Enter the room delete PIN to unlock admin controls.',
+      onConfirm: (code) => {
+        pendingDeleteCode = code;
+        socket.emit('authenticateAdmin', { roomKey: currentRoom, deleteCode: code });
+      },
+    });
   });
   
   messageInput.addEventListener('keypress', (e) => {
@@ -458,38 +717,31 @@ const socket = io({
   // --- Socket.IO handlers ------------------------------------------------------
   
   socket.on('roomCreated', (data) => {
-    currentRoom = data.roomKey;
-    currentType = data.type;
-    currentUsername = data.username;
-    currentAdminKey = data.adminKey;
-    isAdmin = data.isAdmin;
-    roomUsers = [{ id: socket.id, username: currentUsername }];
-  
-    updateRoomHeader();
-    usernameDisplay.textContent = currentUsername;
-    userCountDisplay.textContent = data.userCount;
-    updateAdminUi();
-    storeAdminKey(currentRoom, currentAdminKey);
-  
-    messageMap.clear();
-    showPage(chatRoomPage);
-    clearChatMessages();
-    addRoomInfoCard();
-    renderMembers();
-    messageInput.focus();
+    setButtonLoading(createPublicBtn, false, '<i class="fas fa-globe"></i> Create Public Room');
+    setButtonLoading(createPrivateBtn, false, '<i class="fas fa-lock"></i> Create Private Room');
+    publicRoomNameInput.value = '';
+    storeDeleteCode(data.roomKey, data.deleteCode);
+
+    pendingRoomEntry = data;
+    createdPinDisplay.textContent = data.deleteCode;
+    createdRoomNameLabel.textContent = data.name || (data.type === 'private' ? 'Private room' : 'Room');
+    roomCreatedModal.classList.remove('hidden');
+    showToast('Room created! Save your delete PIN.', 'success');
   });
-  
+
   socket.on('roomJoined', (data) => {
+    setButtonLoading(joinSubmitBtn, false, '<i class="fas fa-sign-in-alt"></i> Join');
     currentRoom = data.roomKey;
+    currentRoomName = data.name || null;
     currentType = data.type;
     currentUsername = data.username;
     isAdmin = data.isAdmin;
     roomUsers = data.users || [];
-  
+
     updateRoomHeader();
     usernameDisplay.textContent = currentUsername;
     userCountDisplay.textContent = data.userCount;
-    if (isAdmin) currentAdminKey = pendingAdminKey || getStoredAdminKey(currentRoom);
+    if (isAdmin) currentDeleteCode = pendingDeleteCode || getStoredDeleteCode(currentRoom);
     updateAdminUi();
   
     if (isReconnecting) {
@@ -511,30 +763,38 @@ const socket = io({
     messageInput.focus();
     joinErrorMessage.textContent = '';
     roomKeyInput.value = '';
+    showToast(`Joined ${data.name || 'the room'}`, 'success');
   
     // Try to reclaim admin if we have the key stored from before
     if (!isAdmin) {
-      const stored = getStoredAdminKey(currentRoom);
+      const stored = getStoredDeleteCode(currentRoom);
       if (stored) {
-        pendingAdminKey = stored;
-        socket.emit('authenticateAdmin', { roomKey: currentRoom, adminKey: stored });
+        pendingDeleteCode = stored;
+        socket.emit('authenticateAdmin', { roomKey: currentRoom, deleteCode: stored });
       }
     }
   });
-  
+
   socket.on('adminAuthenticated', (data) => {
     if (data.success) {
       isAdmin = true;
-      currentAdminKey = pendingAdminKey || currentAdminKey;
-      if (currentAdminKey) storeAdminKey(currentRoom, currentAdminKey);
+      currentDeleteCode = pendingDeleteCode || currentDeleteCode;
+      if (currentDeleteCode) storeDeleteCode(currentRoom, currentDeleteCode);
       if (data.users) roomUsers = data.users;
       updateAdminUi();
       renderMembers();
       addSystemMessage('Admin controls unlocked.');
+      showToast('Admin controls unlocked', 'success');
     } else {
-      alert(data.message || 'Invalid management key');
+      showToast(data.message || 'Invalid delete PIN', 'error');
     }
-    pendingAdminKey = null;
+    pendingDeleteCode = null;
+  });
+
+  socket.on('publicRoomsUpdated', (data) => {
+    if (greetingPage.classList.contains('active')) {
+      renderPublicRooms(data.rooms || []);
+    }
   });
   
   socket.on('newMessage', (data) => {
@@ -574,21 +834,27 @@ const socket = io({
   });
   
   socket.on('removedFromRoom', (data) => {
-    alert(data.message || 'You have been removed from the room');
-    resetToGreeting();
+    showAlert('Removed from room', data.message || 'You have been removed from the room.', resetToGreeting);
   });
   
   socket.on('roomClosed', (data) => {
-    alert(data.message);
-    if (currentRoom) clearStoredAdminKey(currentRoom);
-    resetToGreeting();
+    showAlert('Room closed', data.message, () => {
+      if (currentRoom) clearStoredDeleteCode(currentRoom);
+      resetToGreeting();
+    });
   });
   
   socket.on('error', (data) => {
+    setButtonLoading(createPublicBtn, false, '<i class="fas fa-globe"></i> Create Public Room');
+    setButtonLoading(createPrivateBtn, false, '<i class="fas fa-lock"></i> Create Private Room');
+    setButtonLoading(joinSubmitBtn, false, '<i class="fas fa-sign-in-alt"></i> Join');
     if (joinRoomPage.classList.contains('active')) {
       joinErrorMessage.textContent = data.message;
+    } else if (publicRoomError && greetingPage.classList.contains('active')) {
+      publicRoomError.textContent = data.message;
+      publicRoomError.classList.remove('hidden');
     } else {
-      alert(data.message);
+      showToast(data.message, 'error');
     }
   });
   
@@ -598,7 +864,7 @@ const socket = io({
       isReconnecting = true;
       socket.emit('joinRoom', {
         roomKey: currentRoom,
-        adminKey: currentAdminKey || getStoredAdminKey(currentRoom)
+        deleteCode: currentDeleteCode || getStoredDeleteCode(currentRoom)
       });
     }
   });
@@ -613,8 +879,9 @@ const socket = io({
     history.replaceState(null, '', window.location.pathname);
     socket.emit('joinRoom', {
       roomKey: roomKeyFromUrl,
-      adminKey: getStoredAdminKey(roomKeyFromUrl)
+      deleteCode: getStoredDeleteCode(roomKeyFromUrl)
     });
   } else {
     showPage(greetingPage);
+    loadPublicRooms();
   }
