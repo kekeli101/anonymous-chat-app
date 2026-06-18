@@ -38,6 +38,10 @@ const activeRooms = new Map();
 // Get port from environment variable or use default
 const PORT = process.env.PORT || 3000;
 
+// Master key — deletes any public room when entered instead of the room delete PIN.
+// Set SUPERADMIN_KEY in your environment (e.g. on Render).
+const SUPERADMIN_KEY = (process.env.SUPERADMIN_KEY || '').toString().trim();
+
 // Self-pinging logic to keep the app active on Render
 const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
 if (RENDER_EXTERNAL_URL) {
@@ -209,6 +213,14 @@ function emitUserList(roomKey, room) {
 
 function isRoomAdmin(room, socketId) {
   return room.admins.has(socketId);
+}
+
+function canDeletePublicRoom(room, deleteCode) {
+  const code = (deleteCode || '').toString().trim();
+  if (!code) return false;
+  if (code === room.deleteCode) return true;
+  if (SUPERADMIN_KEY && code === SUPERADMIN_KEY) return true;
+  return false;
 }
 
 // --- Socket.IO ---------------------------------------------------------------
@@ -465,14 +477,15 @@ io.on('connection', (socket) => {
     }
 
     if (room.type === 'public') {
-      if (!deleteCode || deleteCode !== room.deleteCode) {
+      if (!canDeletePublicRoom(room, deleteCode)) {
         socket.emit('error', { message: 'Invalid delete code' });
         return;
       }
+      const usedSuperadmin = SUPERADMIN_KEY && deleteCode === SUPERADMIN_KEY;
       io.to(roomKey).emit('roomClosed', { message: 'This room has been deleted' });
       activeRooms.delete(roomKey);
       broadcastPublicRooms();
-      console.log(`Public room deleted: ${roomKey}`);
+      console.log(`Public room deleted: ${roomKey}${usedSuperadmin ? ' (superadmin)' : ''}`);
       return;
     }
 

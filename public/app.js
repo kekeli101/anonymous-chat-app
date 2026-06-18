@@ -94,6 +94,7 @@ const socket = io({
   let isReconnecting = false;
   let pendingRoomEntry = null;
   let pinModalCallback = null;
+  let pinModalAllowAnyKey = false;
   let confirmModalCallback = null;
   
   const typingUsers = new Set();
@@ -116,11 +117,21 @@ const socket = io({
     };
   }
 
-  function openPinModal({ title, description, onConfirm }) {
+  function openPinModal({ title, description, onConfirm, allowAnyKey = false }) {
     pinModalTitle.textContent = title;
     pinModalDesc.textContent = description;
     pinModalInput.value = '';
     pinModalError.classList.add('hidden');
+    pinModalAllowAnyKey = allowAnyKey;
+    if (allowAnyKey) {
+      pinModalInput.maxLength = 64;
+      pinModalInput.removeAttribute('inputmode');
+      pinModalInput.placeholder = 'Delete PIN or superadmin key';
+    } else {
+      pinModalInput.maxLength = 6;
+      pinModalInput.setAttribute('inputmode', 'numeric');
+      pinModalInput.placeholder = '6-digit PIN';
+    }
     pinModal.classList.remove('hidden');
     pinModalCallback = onConfirm;
     setTimeout(() => pinModalInput.focus(), 100);
@@ -642,7 +653,8 @@ const socket = io({
     if (currentType === 'public') {
       openPinModal({
         title: 'Delete room',
-        description: 'Enter the 6-digit delete PIN to delete this room for everyone.',
+        description: 'Enter the room delete PIN, or the superadmin key to delete any public room.',
+        allowAnyKey: true,
         onConfirm: (code) => {
           openConfirmModal({
             title: '<i class="fas fa-triangle-exclamation"></i> Delete room?',
@@ -677,7 +689,13 @@ const socket = io({
   pinModalCancel.addEventListener('click', closePinModal);
   pinModalConfirm.addEventListener('click', () => {
     const code = pinModalInput.value.trim();
-    if (!/^\d{6}$/.test(code)) {
+    if (pinModalAllowAnyKey) {
+      if (code.length < 4) {
+        pinModalError.textContent = 'Enter the room delete PIN or superadmin key.';
+        pinModalError.classList.remove('hidden');
+        return;
+      }
+    } else if (!/^\d{6}$/.test(code)) {
       pinModalError.textContent = 'Please enter a valid 6-digit PIN.';
       pinModalError.classList.remove('hidden');
       return;
