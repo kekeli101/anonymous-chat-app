@@ -895,6 +895,15 @@ input[type="text"]:focus {
     background-color: rgba(255, 255, 255, 0.12);
 }
 
+.header-actions .delete-header-btn {
+    color: #ffb4b4;
+}
+
+.header-actions .delete-header-btn:hover {
+    color: #fff;
+    background-color: rgba(255, 71, 87, 0.35);
+}
+
 .chat-header .room-info .back-btn {
     color: #ffffff;
     background: rgba(255, 255, 255, 0.22);

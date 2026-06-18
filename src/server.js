@@ -152,6 +152,7 @@ function pruneStaleAdmins(room) {
 }
 
 function ensureRoomHasAdmin(roomKey, room) {
+  if (room.type === 'public') return;
   pruneStaleAdmins(room);
   if (room.users.size === 0 || room.admins.size > 0) return;
 
@@ -348,14 +349,8 @@ io.on('connection', (socket) => {
 
     for (const [roomKey, room] of activeRooms.entries()) {
       if (room.users.has(socket.id)) {
-        const oldUsername = room.users.get(socket.id);
         room.users.set(socket.id, clean);
         room.lastActivity = new Date();
-
-        io.to(roomKey).emit('systemMessage', {
-          message: `${oldUsername} has changed their name to ${clean}`,
-          timestamp: new Date()
-        });
         emitUserList(roomKey, room);
         return;
       }
@@ -427,7 +422,7 @@ io.on('connection', (socket) => {
       socket.emit('error', { message: 'Room not found' });
       return;
     }
-    if (!isRoomAdmin(room, socket.id)) {
+    if (room.type === 'private' && !isRoomAdmin(room, socket.id)) {
       socket.emit('error', { message: 'Only a room admin can remove users' });
       return;
     }
@@ -459,21 +454,30 @@ io.on('connection', (socket) => {
     console.log(`User ${targetUsername} removed from ${roomKey}`);
   });
 
-  // Delete the room entirely (admin only, and only when alone in the room)
+  // Delete room: public = anyone with delete code; private = admin only when alone
   socket.on('deleteRoom', (data) => {
-    const { roomKey } = data || {};
+    const { roomKey, deleteCode } = data || {};
     const room = activeRooms.get(roomKey);
 
     if (!room) {
       socket.emit('error', { message: 'Room not found' });
       return;
     }
-    if (!isRoomAdmin(room, socket.id)) {
-      socket.emit('error', { message: 'Only a room admin can delete this room' });
+
+    if (room.type === 'public') {
+      if (!deleteCode || deleteCode !== room.deleteCode) {
+        socket.emit('error', { message: 'Invalid delete code' });
+        return;
+      }
+      io.to(roomKey).emit('roomClosed', { message: 'This room has been deleted' });
+      activeRooms.delete(roomKey);
+      broadcastPublicRooms();
+      console.log(`Public room deleted: ${roomKey}`);
       return;
     }
-    if (room.type === 'public') {
-      socket.emit('error', { message: 'Public rooms cannot be deleted' });
+
+    if (!isRoomAdmin(room, socket.id)) {
+      socket.emit('error', { message: 'Only a room admin can delete this room' });
       return;
     }
     if (room.users.size > 1) {
@@ -485,9 +489,6 @@ io.on('connection', (socket) => {
 
     io.to(roomKey).emit('roomClosed', { message: 'This room has been deleted' });
     activeRooms.delete(roomKey);
-    if (room.type === 'public') {
-      broadcastPublicRooms();
-    }
     console.log(`Room deleted: ${roomKey}`);
   });
 

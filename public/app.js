@@ -23,6 +23,7 @@ const socket = io({
   
   // Chat controls
   const deleteRoomBtn = document.getElementById('delete-room-btn');
+  const deleteRoomHeaderBtn = document.getElementById('delete-room-header-btn');
   const leaveRoomBtn = document.getElementById('leave-room-btn');
   const sendMessageBtn = document.getElementById('send-message-btn');
   const messageInput = document.getElementById('message-input');
@@ -282,7 +283,18 @@ const socket = io({
   }
   
   function updateAdminUi() {
-    const showDelete = isAdmin && currentType !== 'public';
+    const isPublic = currentType === 'public';
+
+    if (isPublic) {
+      adminControls.style.display = 'none';
+      if (adminKeyBtn) adminKeyBtn.style.display = 'none';
+      if (deleteRoomHeaderBtn) deleteRoomHeaderBtn.classList.remove('hidden');
+      return;
+    }
+
+    if (deleteRoomHeaderBtn) deleteRoomHeaderBtn.classList.add('hidden');
+
+    const showDelete = isAdmin;
     adminControls.style.display = showDelete ? 'flex' : 'none';
     if (adminKeyBtn) adminKeyBtn.style.display = isAdmin ? 'none' : 'flex';
     if (deleteRoomBtn) {
@@ -338,7 +350,7 @@ const socket = io({
     } else {
       html += `<div><i class="fas fa-globe"></i> Public room — anyone with the link can join.</div>`;
       if (currentDeleteCode) {
-        html += `<div class="admin-key-warning"><i class="fas fa-shield-halved"></i> Save your 6-digit delete code to unlock admin controls (remove users). Public rooms stay open for anyone to join.</div>` +
+        html += `<div class="admin-key-warning"><i class="fas fa-shield-halved"></i> Anyone with the delete code can remove this room. The room stays open until then.</div>` +
           `<div><i class="fas fa-shield-halved"></i> Delete code: ` +
           `<code>${currentDeleteCode}</code> ` +
           `<button class="btn-icon copy-btn" data-copy="${currentDeleteCode}" title="Copy delete code"><i class="fas fa-copy"></i></button></div>`;
@@ -375,7 +387,7 @@ const socket = io({
       name.textContent = u.username + (u.id === socket.id ? ' (you)' : '');
       item.appendChild(name);
   
-      if (isAdmin && u.id !== socket.id) {
+      if (isAdmin && currentType === 'private' && u.id !== socket.id) {
         const removeBtn = document.createElement('button');
         removeBtn.classList.add('btn-icon', 'member-remove');
         removeBtn.title = 'Remove user';
@@ -624,8 +636,27 @@ const socket = io({
     resetToGreeting();
   });
 
-  deleteRoomBtn.addEventListener('click', () => {
-    if (!currentRoom || !isAdmin || currentType === 'public') return;
+  function handleDeleteRoom() {
+    if (!currentRoom) return;
+
+    if (currentType === 'public') {
+      openPinModal({
+        title: 'Delete room',
+        description: 'Enter the 6-digit delete PIN to delete this room for everyone.',
+        onConfirm: (code) => {
+          openConfirmModal({
+            title: '<i class="fas fa-triangle-exclamation"></i> Delete room?',
+            message: 'This removes the room for everyone. This cannot be undone.',
+            onConfirm: () => {
+              socket.emit('deleteRoom', { roomKey: currentRoom, deleteCode: code });
+            },
+          });
+        },
+      });
+      return;
+    }
+
+    if (!isAdmin) return;
     const count = parseInt(userCountDisplay.textContent, 10) || roomUsers.length;
     if (count > 1) {
       showToast('This room can only be deleted when no one else is in it.', 'error');
@@ -638,7 +669,10 @@ const socket = io({
         socket.emit('deleteRoom', { roomKey: currentRoom });
       },
     });
-  });
+  }
+
+  deleteRoomBtn.addEventListener('click', handleDeleteRoom);
+  if (deleteRoomHeaderBtn) deleteRoomHeaderBtn.addEventListener('click', handleDeleteRoom);
 
   pinModalCancel.addEventListener('click', closePinModal);
   pinModalConfirm.addEventListener('click', () => {
@@ -689,6 +723,7 @@ const socket = io({
   });
   
   adminKeyBtn.addEventListener('click', () => {
+    if (currentType === 'public') return;
     const isPrivate = currentType === 'private';
     openPinModal({
       title: 'Admin access',
@@ -755,7 +790,7 @@ const socket = io({
         roomCreatedModalTitle.innerHTML = '<i class="fas fa-check-circle"></i> Room created!';
       }
       if (roomCreatedModalText) {
-        roomCreatedModalText.innerHTML = 'Save this <strong>6-digit delete PIN</strong> to unlock admin controls later. This public room stays open even when empty.';
+        roomCreatedModalText.innerHTML = 'Save this <strong>6-digit delete PIN</strong>. Anyone with this PIN can delete the room. Share the invite link so others can join.';
       }
       if (copyCreatedPinBtn) {
         copyCreatedPinBtn.innerHTML = '<i class="fas fa-copy"></i> Copy PIN';
@@ -803,7 +838,7 @@ const socket = io({
     showToast(`Joined ${data.name || 'the room'}`, 'success');
   
     // Try to reclaim admin if we have the key stored from before
-    if (!isAdmin) {
+    if (!isAdmin && currentType === 'private') {
       const stored = getStoredDeleteCode(currentRoom);
       if (stored) {
         pendingDeleteCode = stored;
@@ -829,6 +864,7 @@ const socket = io({
   });
 
   socket.on('promotedToAdmin', (data) => {
+    if (currentType === 'public') return;
     isAdmin = true;
     if (data.users) roomUsers = data.users;
     if (data.userCount != null) userCountDisplay.textContent = data.userCount;
