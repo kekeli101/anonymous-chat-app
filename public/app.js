@@ -680,7 +680,7 @@ const socket = io({
     if (!currentRoom) return;
     socket.emit('leaveRoom', { roomKey: currentRoom });
     const rejoinHint = currentType === 'private'
-      ? 'You can rejoin with the same key for 30 minutes.'
+      ? 'You can rejoin with the same key anytime.'
       : '';
     showToast(rejoinHint ? `You left the room. ${rejoinHint}` : 'You left the room', 'success');
     resetToGreeting();

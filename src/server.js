@@ -4,6 +4,7 @@ const socketIo = require('socket.io');
 const path = require('path');
 const cors = require('cors');
 const crypto = require('crypto');
+const db = require('./db');
 
 // Initialize Express app
 const app = express();
@@ -21,29 +22,25 @@ const io = socketIo(server, {
   }
 });
 
-// Store active rooms
+// Runtime room state (connected users are always in-memory)
 // roomKey -> {
 //   type: 'public' | 'private',
-//   name: string | null,         // public rooms only
-//   deleteCode: string,          // 6-digit code to delete the room (private: same as roomKey)
+//   name: string | null,
+//   deleteCode: string,
 //   creator: socketId,
 //   admins: Set<socketId>,
 //   users: Map<socketId, username>,
 //   createdAt: Date,
 //   lastActivity: Date,
-//   emptySince: Date | null,     // when last user left; room deleted after grace period
+//   emptySince: Date | null,
 //   messages: []
 // }
 const activeRooms = new Map();
+const dbEnabled = db.isEnabled();
 
-// Get port from environment variable or use default
 const PORT = process.env.PORT || 3000;
-
-// Master key — deletes any public room when entered instead of the room delete PIN.
-// Set SUPERADMIN_KEY in your environment (e.g. on Render).
 const SUPERADMIN_KEY = (process.env.SUPERADMIN_KEY || '').toString().trim();
 
-// Self-pinging logic to keep the app active on Render
 const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
 if (RENDER_EXTERNAL_URL) {
   setInterval(() => {
@@ -52,72 +49,93 @@ if (RENDER_EXTERNAL_URL) {
     }).on('error', (err) => {
       console.error(`Self-ping error: ${err.message}`);
     });
-  }, 14 * 60 * 1000); // Ping every 14 minutes
+  }, 14 * 60 * 1000);
 }
 
-// OPTIONAL safety valve. Disabled by default so rooms truly never auto-delete.
-// Set ROOM_INACTIVITY_LIMIT_MS (in ms) to auto-remove rooms with no activity
-// (messages/joins) for that long. Leave it unset to keep every room forever
-// (until deleted with the admin key, or the server restarts).
 const ROOM_INACTIVITY_LIMIT_MS = process.env.ROOM_INACTIVITY_LIMIT_MS
   ? Number(process.env.ROOM_INACTIVITY_LIMIT_MS)
   : null;
 
+async function removeRoomEverywhere(roomKey, room) {
+  activeRooms.delete(roomKey);
+  if (dbEnabled) {
+    await db.deleteRoom(roomKey);
+  }
+  if (room && room.type === 'public') {
+    broadcastPublicRooms();
+  }
+}
+
 if (ROOM_INACTIVITY_LIMIT_MS) {
-  setInterval(() => {
+  setInterval(async () => {
     const now = Date.now();
     for (const [roomKey, room] of activeRooms.entries()) {
       if (room.type === 'public') continue;
       if (now - new Date(room.lastActivity).getTime() > ROOM_INACTIVITY_LIMIT_MS) {
         io.to(roomKey).emit('roomClosed', { message: 'Room closed due to long inactivity' });
-        const wasPublic = room.type === 'public';
-        activeRooms.delete(roomKey);
-        if (wasPublic) broadcastPublicRooms();
+        await removeRoomEverywhere(roomKey, room);
         console.log(`Room removed (inactivity): ${roomKey}`);
       }
     }
   }, 60 * 1000);
 }
 
-// How long an empty private room stays joinable before it is removed (default 30 min).
+// In-memory-only fallback when Supabase is not configured
 const EMPTY_ROOM_GRACE_MS = process.env.EMPTY_ROOM_GRACE_MS
   ? Number(process.env.EMPTY_ROOM_GRACE_MS)
   : 30 * 60 * 1000;
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [roomKey, room] of activeRooms.entries()) {
-    if (room.type === 'public' || room.users.size > 0 || !room.emptySince) continue;
-    if (now - new Date(room.emptySince).getTime() >= EMPTY_ROOM_GRACE_MS) {
-      activeRooms.delete(roomKey);
-      console.log(`Room deleted (empty grace expired): ${roomKey}`);
+if (!dbEnabled) {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [roomKey, room] of activeRooms.entries()) {
+      if (room.type === 'public' || room.users.size > 0 || !room.emptySince) continue;
+      if (now - new Date(room.emptySince).getTime() >= EMPTY_ROOM_GRACE_MS) {
+        activeRooms.delete(roomKey);
+        console.log(`Room deleted (empty grace expired): ${roomKey}`);
+      }
     }
-  }
-}, 60 * 1000);
+  }, 60 * 1000);
+}
 
-// --- Key / id generators -----------------------------------------------------
+async function roomKeyTaken(roomKey) {
+  if (activeRooms.has(roomKey)) return true;
+  if (dbEnabled) return db.roomExists(roomKey);
+  return false;
+}
 
-// 6-digit numeric delete code (save this to delete the room later)
+async function generatePublicId() {
+  let id;
+  do {
+    id = crypto.randomBytes(6).toString('hex');
+  } while (await roomKeyTaken(id));
+  return id;
+}
+
+async function generatePrivateKey() {
+  let key;
+  do {
+    key = Math.floor(100000 + Math.random() * 900000).toString();
+  } while (await roomKeyTaken(key));
+  return key;
+}
+
 function generateDeleteCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Longer, link-friendly id for PUBLIC rooms (shared openly via link)
-function generatePublicId() {
-  let id;
-  do {
-    id = crypto.randomBytes(6).toString('hex'); // 12 hex chars
-  } while (activeRooms.has(id));
-  return id;
-}
+async function hydrateRoom(roomKey) {
+  if (activeRooms.has(roomKey)) {
+    return activeRooms.get(roomKey);
+  }
+  if (!dbEnabled) return null;
 
-// 6-digit numeric key for PRIVATE rooms (the secret you share to let people in)
-function generatePrivateKey() {
-  let key;
-  do {
-    key = Math.floor(100000 + Math.random() * 900000).toString();
-  } while (activeRooms.has(key));
-  return key;
+  const row = await db.getRoom(roomKey);
+  if (!row) return null;
+
+  const room = db.rowToRoom(row);
+  activeRooms.set(roomKey, room);
+  return room;
 }
 
 function getPublicRoomsList() {
@@ -137,6 +155,13 @@ function getPublicRoomsList() {
 
 function broadcastPublicRooms() {
   io.emit('publicRoomsUpdated', { rooms: getPublicRoomsList() });
+}
+
+function schedulePersist(roomKey, room) {
+  if (!dbEnabled) return;
+  db.persistRoom(roomKey, room).catch((err) => {
+    console.error(`Failed to persist room ${roomKey}:`, err.message || err);
+  });
 }
 
 function removeUserFromRoom(socket, roomKey, room, leaveSocket = true) {
@@ -193,17 +218,24 @@ function ensureRoomHasAdmin(roomKey, room) {
 function markRoomEmptyIfNeeded(roomKey, room) {
   if (room.users.size > 0) {
     room.emptySince = null;
+    schedulePersist(roomKey, room);
     return;
   }
   if (room.type === 'public') return;
   if (room.emptySince) return;
 
   room.emptySince = new Date();
+  schedulePersist(roomKey, room);
+
+  if (dbEnabled) {
+    console.log(`Private room empty (kept in database until deleted): ${roomKey}`);
+    return;
+  }
+
   const graceMinutes = Math.round(EMPTY_ROOM_GRACE_MS / 60000);
   console.log(`Room empty, scheduled deletion in ${graceMinutes} min: ${roomKey}`);
 }
 
-// Generate a random username
 function generateUsername() {
   const adjectives = [
     'Silent', 'Hidden', 'Shadow', 'Secret', 'Masked', 'Mad',
@@ -218,8 +250,6 @@ function generateUsername() {
   const randomAnimal = animals[Math.floor(Math.random() * animals.length)];
   return `${randomAdjective}-${randomAnimal}`;
 }
-
-// --- Helpers -----------------------------------------------------------------
 
 function publicUserList(room) {
   return Array.from(room.users.entries()).map(([id, username]) => ({ id, username }));
@@ -244,13 +274,10 @@ function canDeletePublicRoom(room, deleteCode) {
   return false;
 }
 
-// --- Socket.IO ---------------------------------------------------------------
-
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
-  // Create a new room (public or private)
-  socket.on('createRoom', (data = {}) => {
+  socket.on('createRoom', async (data = {}) => {
     const type = data.type === 'public' ? 'public' : 'private';
     const roomName = (data.name || '').toString().trim().slice(0, 50);
 
@@ -259,7 +286,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const roomKey = type === 'public' ? generatePublicId() : generatePrivateKey();
+    const roomKey = type === 'public' ? await generatePublicId() : await generatePrivateKey();
     const deleteCode = type === 'private' ? roomKey : generateDeleteCode();
     const username = generateUsername();
 
@@ -277,6 +304,16 @@ io.on('connection', (socket) => {
     };
 
     activeRooms.set(roomKey, room);
+
+    if (dbEnabled) {
+      const saved = await db.insertRoom(roomKey, room);
+      if (!saved) {
+        activeRooms.delete(roomKey);
+        socket.emit('error', { message: 'Failed to create room. Please try again.' });
+        return;
+      }
+    }
+
     socket.join(roomKey);
 
     socket.emit('roomCreated', {
@@ -296,25 +333,24 @@ io.on('connection', (socket) => {
     console.log(`${type} room created: ${roomKey} (${roomName || 'private'}) by ${username} (${socket.id})`);
   });
 
-  // Join an existing room (public link or private key — both look up by id)
-  socket.on('joinRoom', (data) => {
+  socket.on('joinRoom', async (data) => {
     const { roomKey } = data;
-    const deleteCode = data && data.deleteCode ? data.deleteCode : null;
+    const room = await hydrateRoom(roomKey);
 
-    if (!activeRooms.has(roomKey)) {
+    if (!room) {
       socket.emit('error', { message: 'Room not found' });
       return;
     }
 
-    const room = activeRooms.get(roomKey);
     const username = generateUsername();
 
     room.users.set(socket.id, username);
     room.lastActivity = new Date();
     room.emptySince = null;
     socket.join(roomKey);
+    schedulePersist(roomKey, room);
 
-    let isAdmin = room.admins.has(socket.id);
+    const isAdmin = room.admins.has(socket.id);
 
     socket.emit('roomJoined', {
       roomKey,
@@ -342,7 +378,6 @@ io.on('connection', (socket) => {
     console.log(`User joined ${room.type} room ${roomKey} as ${username} (${socket.id})`);
   });
 
-  // Leave a room without deleting it
   socket.on('leaveRoom', (data) => {
     const { roomKey } = data || {};
     const room = activeRooms.get(roomKey);
@@ -351,7 +386,6 @@ io.on('connection', (socket) => {
     socket.emit('leftRoom', { roomKey });
   });
 
-  // Unlock admin controls by supplying the delete code after joining
   socket.on('authenticateAdmin', (data) => {
     const { roomKey, deleteCode } = data || {};
     const room = activeRooms.get(roomKey);
@@ -377,7 +411,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Change username
   socket.on('changeUsername', (data) => {
     const clean = ((data && data.newUsername) || '').toString().trim().slice(0, 30);
     if (!clean) return;
@@ -392,7 +425,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Send a message to the room
   socket.on('sendMessage', (data) => {
     const { roomKey, message, replyTo } = data;
 
@@ -424,12 +456,12 @@ io.on('connection', (socket) => {
       room.messages = room.messages.slice(-100);
     }
     room.lastActivity = new Date();
+    schedulePersist(roomKey, room);
 
     io.to(roomKey).emit('newMessage', messageObj);
     console.log(`Message in room ${roomKey} from ${username}: ${text}`);
   });
 
-  // Typing indicators
   socket.on('typing', (data) => {
     const { roomKey } = data;
     const room = activeRooms.get(roomKey);
@@ -448,7 +480,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Remove a user from the room (requires the delete code)
   socket.on('removeUser', (data) => {
     const { roomKey, targetId } = data || {};
     const room = activeRooms.get(roomKey);
@@ -462,7 +493,7 @@ io.on('connection', (socket) => {
       return;
     }
     if (!room.users.has(targetId)) {
-      socket.emit('error', { message: 'User is no longer in the room' });
+      socket.emit('error', { message: 'User is not in the room' });
       return;
     }
 
@@ -489,10 +520,9 @@ io.on('connection', (socket) => {
     console.log(`User ${targetUsername} removed from ${roomKey}`);
   });
 
-  // Delete room: public = anyone with delete code; private = admin only when alone
-  socket.on('deleteRoom', (data) => {
+  socket.on('deleteRoom', async (data) => {
     const { roomKey, deleteCode } = data || {};
-    const room = activeRooms.get(roomKey);
+    const room = await hydrateRoom(roomKey);
 
     if (!room) {
       socket.emit('error', { message: 'Room not found' });
@@ -506,8 +536,7 @@ io.on('connection', (socket) => {
       }
       const usedSuperadmin = SUPERADMIN_KEY && deleteCode === SUPERADMIN_KEY;
       io.to(roomKey).emit('roomClosed', { message: 'This room has been deleted' });
-      activeRooms.delete(roomKey);
-      broadcastPublicRooms();
+      await removeRoomEverywhere(roomKey, room);
       console.log(`Public room deleted: ${roomKey}${usedSuperadmin ? ' (superadmin)' : ''}`);
       return;
     }
@@ -524,11 +553,10 @@ io.on('connection', (socket) => {
     }
 
     io.to(roomKey).emit('roomClosed', { message: 'This room has been deleted' });
-    activeRooms.delete(roomKey);
+    await removeRoomEverywhere(roomKey, room);
     console.log(`Room deleted: ${roomKey}`);
   });
 
-  // User disconnects — remove them; empty private rooms stay joinable for the grace period
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
 
@@ -540,7 +568,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// Routes
 app.get('/api/public-rooms', (req, res) => {
   res.json({ rooms: getPublicRoomsList() });
 });
@@ -549,15 +576,32 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-// For Vercel serverless functions
+async function startServer() {
+  if (dbEnabled) {
+    const rows = await db.loadAllRooms();
+    for (const row of rows) {
+      activeRooms.set(row.room_key, db.rowToRoom(row));
+    }
+    console.log(`Loaded ${rows.length} room(s) from Supabase`);
+  } else {
+    console.warn('Supabase not configured — rooms are in-memory only (lost on restart).');
+    console.warn('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to enable persistence.');
+  }
+
+  if (!process.env.VERCEL) {
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
+}
+
 if (process.env.VERCEL) {
   module.exports = app;
 } else {
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  startServer().catch((err) => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
   });
 }
 
 module.exports = app;
-
-// Last updated: 2026-06-18
