@@ -31,6 +31,7 @@ const io = socketIo(server, {
 //   users: Map<socketId, username>,
 //   createdAt: Date,
 //   lastActivity: Date,
+//   emptySince: Date | null,     // when last user left; room deleted after grace period
 //   messages: []
 // }
 const activeRooms = new Map();
@@ -77,6 +78,22 @@ if (ROOM_INACTIVITY_LIMIT_MS) {
     }
   }, 60 * 1000);
 }
+
+// How long an empty private room stays joinable before it is removed (default 30 min).
+const EMPTY_ROOM_GRACE_MS = process.env.EMPTY_ROOM_GRACE_MS
+  ? Number(process.env.EMPTY_ROOM_GRACE_MS)
+  : 30 * 60 * 1000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [roomKey, room] of activeRooms.entries()) {
+    if (room.type === 'public' || room.users.size > 0 || !room.emptySince) continue;
+    if (now - new Date(room.emptySince).getTime() >= EMPTY_ROOM_GRACE_MS) {
+      activeRooms.delete(roomKey);
+      console.log(`Room deleted (empty grace expired): ${roomKey}`);
+    }
+  }
+}, 60 * 1000);
 
 // --- Key / id generators -----------------------------------------------------
 
@@ -140,8 +157,8 @@ function removeUserFromRoom(socket, roomKey, room, leaveSocket = true) {
   }
 
   ensureRoomHasAdmin(roomKey, room);
-  const deleted = deleteRoomIfEmpty(roomKey, room);
-  if (!deleted && room.type === 'public') {
+  markRoomEmptyIfNeeded(roomKey, room);
+  if (room.type === 'public') {
     broadcastPublicRooms();
   }
   console.log(`User left ${roomKey}: ${username} (${socket.id})`);
@@ -173,13 +190,17 @@ function ensureRoomHasAdmin(roomKey, room) {
   console.log(`Promoted ${newAdminId} to admin in ${roomKey}`);
 }
 
-function deleteRoomIfEmpty(roomKey, room) {
-  if (room.users.size > 0) return false;
-  if (room.type === 'public') return false;
+function markRoomEmptyIfNeeded(roomKey, room) {
+  if (room.users.size > 0) {
+    room.emptySince = null;
+    return;
+  }
+  if (room.type === 'public') return;
+  if (room.emptySince) return;
 
-  activeRooms.delete(roomKey);
-  console.log(`Room deleted (empty): ${roomKey}`);
-  return true;
+  room.emptySince = new Date();
+  const graceMinutes = Math.round(EMPTY_ROOM_GRACE_MS / 60000);
+  console.log(`Room empty, scheduled deletion in ${graceMinutes} min: ${roomKey}`);
 }
 
 // Generate a random username
@@ -251,6 +272,7 @@ io.on('connection', (socket) => {
       users: new Map([[socket.id, username]]),
       createdAt: new Date(),
       lastActivity: new Date(),
+      emptySince: null,
       messages: []
     };
 
@@ -289,6 +311,7 @@ io.on('connection', (socket) => {
 
     room.users.set(socket.id, username);
     room.lastActivity = new Date();
+    room.emptySince = null;
     socket.join(roomKey);
 
     let isAdmin = room.admins.has(socket.id);
@@ -459,8 +482,8 @@ io.on('connection', (socket) => {
     });
     emitUserList(roomKey, room);
     ensureRoomHasAdmin(roomKey, room);
-    const deleted = deleteRoomIfEmpty(roomKey, room);
-    if (!deleted && room.type === 'public') {
+    markRoomEmptyIfNeeded(roomKey, room);
+    if (room.type === 'public') {
       broadcastPublicRooms();
     }
     console.log(`User ${targetUsername} removed from ${roomKey}`);
@@ -505,7 +528,7 @@ io.on('connection', (socket) => {
     console.log(`Room deleted: ${roomKey}`);
   });
 
-  // User disconnects — remove them but KEEP the room alive (even if empty)
+  // User disconnects — remove them; empty private rooms stay joinable for the grace period
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
 

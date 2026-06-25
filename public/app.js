@@ -269,7 +269,7 @@ const socket = io({
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
-  
+
   function buildInviteLink() {
     return `${window.location.origin}/?room=${currentRoom}`;
   }
@@ -386,10 +386,10 @@ const socket = io({
   function addRoomInfoCard() {
     const card = document.createElement('div');
     card.classList.add('system-message', 'room-info-card');
-  
+
     const link = buildInviteLink();
     let html = '';
-  
+
     if (currentType === 'private') {
       html += `<div><i class="fas fa-key"></i> Private room key: <strong>${currentRoom}</strong> ` +
         `<button class="btn-icon copy-btn" data-copy="${currentRoom}" title="Copy key"><i class="fas fa-copy"></i></button></div>` +
@@ -403,13 +403,13 @@ const socket = io({
           `<button class="btn-icon copy-btn" data-copy="${currentDeleteCode}" title="Copy delete code"><i class="fas fa-copy"></i></button></div>`;
       }
     }
-  
+
     html += `<div><i class="fas fa-link"></i> Invite link: ` +
       `<button class="btn-icon copy-btn" data-copy="${link}" title="Copy invite link"><i class="fas fa-copy"></i> Copy link</button></div>`;
-  
+
     card.innerHTML = html;
     chatMessages.appendChild(card);
-  
+
     card.querySelectorAll('.copy-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         navigator.clipboard.writeText(btn.dataset.copy)
@@ -422,7 +422,7 @@ const socket = io({
       });
     });
   }
-  
+
   function renderMembers() {
     membersList.innerHTML = '';
     roomUsers.forEach((u) => {
@@ -675,11 +675,14 @@ const socket = io({
     joinErrorMessage.textContent = '';
     roomKeyInput.value = '';
   });
-  
+
   leaveRoomBtn.addEventListener('click', () => {
     if (!currentRoom) return;
     socket.emit('leaveRoom', { roomKey: currentRoom });
-    showToast('You left the room', 'success');
+    const rejoinHint = currentType === 'private'
+      ? 'You can rejoin with the same key for 30 minutes.'
+      : '';
+    showToast(rejoinHint ? `You left the room. ${rejoinHint}` : 'You left the room', 'success');
     resetToGreeting();
   });
 
