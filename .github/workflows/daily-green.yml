@@ -1,0 +1,38 @@
+name: Daily green contribution
+
+on:
+  schedule:
+    # Runs once per day; the number of empty commits is randomized below.
+    - cron: "17 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  green-square:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the default branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create randomized empty commits
+        env:
+          GH_ACTOR: ${{ github.actor }}
+          GH_ACTOR_ID: ${{ github.actor_id }}
+        run: |
+          set -eu
+
+          # 1–3 commits per run, so every successful daily run makes at least one.
+          count=$(( $(od -An -N4 -tu4 /dev/urandom) % 3 + 1 ))
+
+          git config user.name "$GH_ACTOR"
+          git config user.email "$GH_ACTOR_ID+$GH_ACTOR@users.noreply.github.com"
+
+          for i in $(seq 1 "$count"); do
+            git commit --allow-empty -m "chore: daily contribution"
+          done
+
+          git push origin HEAD:${GITHUB_REF_NAME}
