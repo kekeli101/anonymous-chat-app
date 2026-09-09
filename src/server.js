@@ -9,6 +9,12 @@ const db = require('./db');
 // Initialize Express app
 const app = express();
 app.use(cors());
+
+// Lightweight endpoint for platform health checks and the keep-alive request.
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Create HTTP server
@@ -41,15 +47,32 @@ const dbEnabled = db.isEnabled();
 const PORT = process.env.PORT || 3000;
 const SUPERADMIN_KEY = (process.env.SUPERADMIN_KEY || '').toString().trim();
 
-const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
+const RENDER_EXTERNAL_URL = (process.env.RENDER_EXTERNAL_URL || '').trim();
 if (RENDER_EXTERNAL_URL) {
-  setInterval(() => {
-    http.get(RENDER_EXTERNAL_URL, (res) => {
-      console.log(`Self-ping status: ${res.statusCode}`);
-    }).on('error', (err) => {
-      console.error(`Self-ping error: ${err.message}`);
-    });
-  }, 14 * 60 * 1000);
+  const selfPingUrl = new URL(RENDER_EXTERNAL_URL);
+  selfPingUrl.pathname = '/health';
+
+  const pingSelf = async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+
+    try {
+      const response = await fetch(selfPingUrl, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: { 'User-Agent': 'anonymous-chat-self-ping' }
+      });
+      console.log(`Self-ping status: ${response.status}`);
+    } catch (err) {
+      console.error(`Self-ping error: ${err.name === 'AbortError' ? 'timeout' : err.message}`);
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  // Ping immediately so a sleeping instance is woken before the interval starts.
+  pingSelf();
+  setInterval(pingSelf, 14 * 60 * 1000);
 }
 
 const ROOM_INACTIVITY_LIMIT_MS = process.env.ROOM_INACTIVITY_LIMIT_MS
