@@ -1295,3 +1295,293 @@ input[type="text"]:focus {
         gap: 4px;
     }
 }
+
+
+/* ============================================
+   RESPONSIVE LAYOUT POLISH
+   ============================================ */
+
+:root {
+    --page-gutter: clamp(1rem, 3vw, 2.5rem);
+    --content-width: 760px;
+}
+
+button,
+input {
+    font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+[contenteditable="true"]:focus-visible {
+    outline: 3px solid rgba(0, 136, 204, 0.4);
+    outline-offset: 2px;
+}
+
+/* Give the entry screens a wider, calmer desktop composition. */
+#greeting-page .container,
+#join-room-page .container {
+    width: min(100%, var(--content-width));
+    padding: clamp(2rem, 5vw, 4.5rem) var(--page-gutter) 2rem;
+    gap: 1rem;
+}
+
+#greeting-page .container > h1,
+#join-room-page .container > h1 {
+    margin-bottom: 0;
+}
+
+#greeting-page .hero-text,
+#join-room-page .hero-text {
+    max-width: 42rem;
+    margin-bottom: 0.75rem;
+}
+
+#greeting-page .section-card,
+#greeting-page .create-public-form,
+#greeting-page .public-rooms-section {
+    max-width: 100%;
+}
+
+#greeting-page .create-public-form,
+#greeting-page .section-card:not(.create-public-form):not(.public-rooms-section) {
+    padding: 1.25rem;
+    border: 1px solid var(--input-border);
+    background: color-mix(in srgb, var(--card-bg) 88%, transparent);
+    box-shadow: 0 8px 24px var(--shadow-color);
+}
+
+#greeting-page .create-public-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 0.75fr);
+    column-gap: 1.25rem;
+    align-items: center;
+}
+
+#greeting-page .create-public-form .section-title,
+#greeting-page .create-public-form .hint-text,
+#greeting-page .create-public-form label,
+#greeting-page .create-public-form input,
+#greeting-page .create-public-form .field-error {
+    grid-column: 1;
+}
+
+#greeting-page .create-public-form .section-title {
+    grid-row: 1;
+}
+
+#greeting-page .create-public-form .hint-text {
+    grid-row: 2;
+}
+
+#greeting-page .create-public-form label {
+    grid-row: 3;
+}
+
+#greeting-page .create-public-form input {
+    grid-row: 4;
+}
+
+#greeting-page .create-public-form .field-error {
+    grid-row: 5;
+}
+
+#greeting-page .create-public-form .btn {
+    grid-column: 2;
+    grid-row: 1 / span 5;
+    align-self: center;
+}
+
+#greeting-page .section-card:not(.create-public-form):not(.public-rooms-section) {
+    display: flex;
+    flex-direction: column;
+}
+
+#greeting-page .create-options {
+    max-width: none;
+    flex-direction: row;
+    gap: 0.75rem;
+}
+
+#greeting-page .create-options .btn {
+    flex: 1;
+}
+
+/* Keep controls comfortable and consistent across pointer types. */
+.btn {
+    min-height: 44px;
+    margin: 0;
+}
+
+.btn-icon {
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.chat-header {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+}
+
+.chat-messages {
+    padding-left: clamp(0.75rem, 4vw, 3rem);
+    padding-right: clamp(0.75rem, 4vw, 3rem);
+}
+
+.chat-input-container {
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+}
+
+.chat-input {
+    min-height: 44px;
+}
+
+.send-btn {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+}
+
+@media (min-width: 769px) {
+    #greeting-page .public-rooms-section {
+        padding: 0 0.25rem;
+    }
+
+    #greeting-page .public-rooms-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+        max-height: 280px;
+    }
+
+    #greeting-page .public-rooms-empty {
+        grid-column: 1 / -1;
+    }
+
+    .chat-header-main {
+        align-items: center;
+    }
+
+    .chat-messages {
+        padding-top: 1.25rem;
+        padding-bottom: 1.25rem;
+    }
+}
+
+@media (max-width: 768px) {
+    #greeting-page .container,
+    #join-room-page .container {
+        padding-top: 1.5rem;
+        padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    }
+
+    #greeting-page .create-public-form {
+        display: flex;
+        align-items: stretch;
+        gap: 0.55rem;
+    }
+
+    #greeting-page .create-public-form .btn {
+        margin-top: 0.25rem;
+    }
+
+    #greeting-page .create-options {
+        flex-direction: column;
+    }
+
+    .chat-header {
+        gap: 0.25rem;
+    }
+
+    .room-info {
+        gap: 6px;
+    }
+
+    .room-info-text h2 {
+        max-width: min(48vw, 18rem);
+    }
+
+    .header-actions {
+        gap: 0.1rem;
+    }
+
+    .header-actions .btn-icon {
+        min-width: 40px;
+        min-height: 40px;
+    }
+
+    .chat-messages {
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+    }
+
+    .chat-input-container {
+        gap: 8px;
+        padding-top: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    #greeting-page .container,
+    #join-room-page .container {
+        padding-left: 0.85rem;
+        padding-right: 0.85rem;
+        gap: 0.8rem;
+    }
+
+    #greeting-page .create-public-form,
+    #greeting-page .section-card:not(.create-public-form):not(.public-rooms-section) {
+        padding: 1rem;
+    }
+
+    #greeting-page .public-rooms-list {
+        max-height: 34vh;
+    }
+
+    .chat-header {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+
+    .chat-header .room-info .back-btn {
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    .room-info-text h2 {
+        max-width: 42vw;
+        font-size: 0.95rem;
+    }
+
+    .header-actions .btn-icon {
+        min-width: 36px;
+        min-height: 36px;
+        padding: 4px;
+    }
+
+    .user-count {
+        padding: 0.3rem 0.45rem;
+    }
+
+    .message {
+        max-width: 94%;
+        padding: 9px 12px;
+    }
+
+    .system-message {
+        max-width: 100%;
+        text-align: center;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
