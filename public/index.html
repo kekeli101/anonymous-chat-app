@@ -1,274 +1,69 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="description" content="Anonymous Chat - Connect and chat with people anonymously in real-time">
-    <title>Anonymous Chat</title>
-    <!-- Google AdSense — load once in <head> for all ad units on this page -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8537594804200864"
-     crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
-</head>
-<body>
-    <!-- Greeting Page -->
-    <div id="greeting-page" class="page active">
-        <div class="container">
-            <h1>Anonymous Chat</h1>
-            <p class="hero-text">Chat anonymously in real time. Create a public room, a private room, or join one below.</p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Kekeli — computer engineering student, developer, and photographer." />
+    <meta name="theme-color" content="#f1efe9" />
+    <meta property="og:title" content="Kekeli — engineering, software, photography" />
+    <meta property="og:description" content="A personal portfolio for Kekeli, a computer engineering student, developer, and photographer." />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%231a1a18'/><text x='50' y='67' text-anchor='middle' font-family='Arial' font-size='58' fill='%23f1efe9'>K</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <title>Kekeli — computer engineering & photography</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="wordmark" href="#top" aria-label="Kekeli home"><span class="wordmark-mark">K</span><span>kekeli.dev</span></a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu <span aria-hidden="true">↘</span></button>
+      <nav id="site-nav" class="site-nav" aria-label="Main navigation">
+        <a href="#work">Work</a>
+        <a href="#about">About</a>
+        <a href="#photography">Photography</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </header>
 
-            <div class="section-card create-public-form">
-                <h2 class="section-title"><i class="fas fa-globe"></i> Public room</h2>
-                <p class="hint-text">Give your room a name. Anyone can see and join it from the list below.</p>
-                <label for="public-room-name">Room name</label>
-                <input
-                    type="text"
-                    id="public-room-name"
-                    placeholder="e.g. Study group, Gaming lounge..."
-                    maxlength="50"
-                    autocomplete="off"
-                >
-                <p class="field-error hidden" id="public-room-error"></p>
-                <button id="create-public-btn" class="btn primary">
-                    <i class="fas fa-globe"></i> Create Public Room
-                </button>
-            </div>
-
-            <div class="section-card">
-                <h2 class="section-title"><i class="fas fa-lock"></i> Private room</h2>
-                <p class="hint-text">Share your 6-digit key so others can join. You start as admin; the room is removed once everyone has left.</p>
-                <div class="button-group create-options">
-                    <button id="create-private-btn" class="btn primary">
-                        <i class="fas fa-lock"></i> Create Private Room
-                    </button>
-                    <button id="join-room-btn" class="btn secondary">
-                        <i class="fas fa-door-open"></i> Join Private Room
-                    </button>
-                </div>
-            </div>
-
-            <div class="section-card public-rooms-section">
-                <h2 class="section-title"><i class="fas fa-list"></i> Join a public room</h2>
-                <p class="hint-text">Tap a room to join instantly.</p>
-                <div id="public-rooms-list" class="public-rooms-list">
-                    <p class="public-rooms-empty">No public rooms yet. Be the first to create one!</p>
-                </div>
-            </div>
-            <div class="ad-container ad-container--landing">
-                <ins class="adsbygoogle"
-                     style="display:block"
-                     data-ad-client="ca-pub-8537594804200864"
-                     data-ad-slot="REPLACE_WITH_YOUR_AD_SLOT"
-                     data-ad-format="auto"
-                     data-full-width-responsive="true"
-                     data-ad-loaded="true"></ins>
-                <script>
-                    (adsbygoogle = window.adsbygoogle || []).push({});
-                </script>
-            </div>
+    <main id="top">
+      <section class="hero section-wrap" aria-labelledby="hero-title">
+        <div class="hero-kicker"><span class="eyebrow">01 / hello</span><span class="availability"><i></i> open to interesting work</span></div>
+        <div class="hero-grid">
+          <h1 id="hero-title">Hey, I’m <em>Kekeli.</em></h1>
+          <div class="hero-intro">
+            <p class="lede">Computer engineering student, developer, and photographer. I like building useful things, figuring out how systems work, and occasionally carrying a camera around.</p>
+            <div class="hero-links"><a class="arrow-link" href="#work">See the work <span>↘</span></a><a class="text-link" href="#about">A little more about me</a></div>
+          </div>
         </div>
-    </div>
+        <div class="hero-footer"><span>Accra, Ghana</span><span>Currently learning: systems &amp; embedded things</span><span class="scroll-note">Scroll to explore ↓</span></div>
+      </section>
 
-    <!-- Join Room Page (private rooms only) -->
-    <div id="join-room-page" class="page">
-        <div class="container">
-            <h1>Join Private Room</h1>
-            <p class="hero-text">Enter the 6-digit key shared by the room creator.</p>
-            <div class="input-group">
-                <input 
-                    type="text" 
-                    id="room-key-input" 
-                    placeholder="Enter room key" 
-                    maxlength="6" 
-                    pattern="[0-9]{6}"
-                    inputmode="numeric"
-                >
-                <div class="error-message" id="join-error-message"></div>
-            </div>
-            <div class="button-group">
-                <button id="join-submit-btn" class="btn primary">
-                    <i class="fas fa-sign-in-alt"></i> Join
-                </button>
-                <button id="join-back-btn" class="btn secondary">
-                    <i class="fas fa-arrow-left"></i> Back
-                </button>
-            </div>
-            <div class="ad-container ad-container--landing">
-                <ins class="adsbygoogle"
-                     style="display:block"
-                     data-ad-client="ca-pub-8537594804200864"
-                     data-ad-slot="REPLACE_WITH_YOUR_AD_SLOT"
-                     data-ad-format="auto"
-                     data-full-width-responsive="true"></ins>
-            </div>
-        </div>
-    </div>
+      <section id="work" class="work section-wrap" aria-labelledby="work-title">
+        <div class="section-heading"><span class="eyebrow">02 / selected work</span><h2 id="work-title">Things I’ve made<br /><em>and learned from.</em></h2><p class="section-note">A small collection of software and engineering projects. I’m more interested in the decisions behind them than a long list of technologies.</p></div>
+        <article class="project project-featured">
+          <div class="project-image project-image-chat"><div class="browser-bar"><span></span><span></span><span></span><b>anonymous-chat-app</b></div><div class="chat-preview"><div class="chat-line short"></div><div class="chat-line"></div><div class="chat-line long"></div><div class="chat-line own"></div><div class="chat-line own short"></div></div><span class="image-caption">01 — realtime room, viewed from the inside</span></div>
+          <div class="project-copy"><div class="project-label"><span>Project 01</span><span>2024 — ongoing</span></div><h3>Anonymous Chat App</h3><p>A real-time anonymous communication app built around the simple idea that a conversation should be easy to start. Users can make public or private rooms, share a key, and talk without signing up.</p><dl class="project-details"><div><dt>Built with</dt><dd>Node.js · Express · Socket.IO · Supabase</dd></div><div><dt>My role</dt><dd>Product thinking, backend, interface, deployment</dd></div></dl><a class="arrow-link" href="https://github.com/kekeli101/anonymous-chat-app" target="_blank" rel="noreferrer">View on GitHub <span>↗</span></a></div>
+        </article>
+        <article class="project project-split">
+          <div class="project-copy"><div class="project-label"><span>Project 02</span><span>student marketplace</span></div><h3>Tekmart</h3><p>A marketplace concept for university students — a practical answer to the “does anyone have one of these?” messages that fill campus group chats.</p><dl class="project-details"><div><dt>Focus</dt><dd>Product structure · web development · student needs</dd></div><div><dt>Status</dt><dd>Exploring the next useful version</dd></div></dl><span class="quiet-note">Case study in progress</span></div><div class="project-image project-image-market"><div class="market-top"><span>tekmart</span><i>⌕</i></div><div class="market-row"><b>Find it nearby.</b><span>sell something →</span></div><div class="market-items"><span>laptop / GHS 3,200</span><span>desk lamp / GHS 120</span><span>textbooks / GHS 80</span></div><span class="image-caption">02 — a market made for campus life</span></div>
+        </article>
+        <article class="project project-wide"><div class="wide-number">03</div><div><div class="project-label"><span>Project 03</span><span>operations / ordering</span></div><h3>Restaurant Ordering System</h3><p>A platform that connects customer ordering, kitchen management, administration, and Telegram notifications in one flow. The interesting part was not the menu — it was keeping everyone’s version of the order in sync.</p><div class="tag-line"><span>customer ordering</span><span>kitchen view</span><span>admin</span><span>Telegram alerts</span></div></div><span class="quiet-note">Built as a systems exercise</span></article>
+      </section>
 
-    <!-- Chat Room Page -->
-    <div id="chat-room-page" class="page">
-        <div class="chat-container">
-            <!-- Chat Header -->
-            <div class="chat-header">
-                <div class="chat-header-main">
-                    <div class="room-info">
-                        <button id="leave-room-btn" class="btn-icon back-btn" title="Leave room" aria-label="Leave room">
-                            <i class="fas fa-arrow-left"></i>
-                            <span class="back-label">Back</span>
-                        </button>
-                        <div class="room-info-text">
-                            <h2><i class="fas fa-hashtag"></i> <span id="room-name-display">Room</span></h2>
-                            <p class="room-key-line"><i class="fas fa-key"></i> <span id="room-key-display"></span></p>
-                            <p class="room-username-line"><i class="fas fa-user-circle"></i> <span id="username-wrapper"><span id="username-display" contenteditable="true" title="Click to edit your username"></span><span id="edit-icon"><i class="fas fa-edit"></i></span></span></p>
-                        </div>
-                    </div>
-                    <div class="header-actions">
-                        <button id="theme-toggle" class="btn-icon theme-toggle" title="Toggle Dark Mode">
-                            <i class="fas fa-moon"></i>
-                        </button>
-                        <button id="admin-key-btn" class="btn-icon" title="Unlock admin with delete code">
-                            <i class="fas fa-lock"></i>
-                        </button>
-                        <button id="members-btn" class="btn-icon" title="Members">
-                            <i class="fas fa-user-group"></i>
-                        </button>
-                        <button id="delete-room-header-btn" class="btn-icon delete-header-btn hidden" title="Delete room (requires PIN)">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                        <div class="user-count">
-                            <p><i class="fas fa-users"></i> <span id="user-count-display">1</span></p>
-                        </div>
-                    </div>
-                </div>
-                <div class="admin-controls" id="admin-controls">
-                    <button id="delete-room-btn" class="btn danger">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
-                </div>
-            </div>
+      <section id="photography" class="photography section-wrap" aria-labelledby="photo-title">
+        <div class="photo-intro"><div><span class="eyebrow">03 / off the screen</span><h2 id="photo-title">Photography<br /><em>by Kels.</em></h2></div><div class="photo-description"><p>Photography is how I slow down. I’m still building this archive — portraits, street corners, events, and the ordinary details that usually pass by.</p><a class="arrow-link" href="#contact">Ask about a shoot <span>↗</span></a></div></div>
+        <div class="photo-grid" aria-label="Photography archive placeholders"><button class="photo-tile photo-tile-tall" type="button" data-photo="Portraits"><span class="photo-placeholder-mark">+</span><span class="photo-tile-label">Portraits <small>archive coming soon</small></span></button><button class="photo-tile photo-tile-wide" type="button" data-photo="Street"><span class="photo-placeholder-mark">+</span><span class="photo-tile-label">Street <small>archive coming soon</small></span></button><button class="photo-tile photo-tile-small" type="button" data-photo="Everyday moments"><span class="photo-placeholder-mark">+</span><span class="photo-tile-label">Everyday moments <small>archive coming soon</small></span></button></div>
+      </section>
 
-            <!-- Members Panel -->
-            <div class="members-panel" id="members-panel">
-                <div class="members-header">
-                    <h3><i class="fas fa-user-group"></i> Members</h3>
-                    <button id="members-close" class="btn-icon" title="Close">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="members-list" id="members-list"></div>
-            </div>
+      <section id="about" class="about section-wrap" aria-labelledby="about-title"><div class="section-heading"><span class="eyebrow">04 / a bit about me</span><h2 id="about-title">Curious about<br /><em>the whole stack.</em></h2></div><div class="about-grid"><div class="about-copy"><p class="large-copy">I’m studying computer engineering and learning by making things. Some days that means writing software; other days it means getting a microcontroller to behave, or wondering why a circuit is doing something it absolutely should not.</p><p>Outside of coursework, I’ve been working on small products, real-time apps, and the occasional photo story. I like the part where a vague idea becomes something another person can actually use.</p><p>This site is intentionally a work in progress — much like the person it belongs to.</p></div><div class="skills-list"><div><span>Languages</span><p>Python · JavaScript · HTML · CSS</p></div><div><span>Backend</span><p>Node.js · Express · Django · Flask</p></div><div><span>Data &amp; tools</span><p>PostgreSQL · Firebase · Git · GitHub</p></div><div><span>Engineering</span><p>Embedded systems · Microcontrollers · Digital systems</p></div></div></div></section>
 
-            <!-- Chat Messages Area -->
-            <div class="chat-messages" id="chat-messages">
-                <div class="system-message">
-                    <i class="fas fa-info-circle"></i> Welcome! Type a message below to start chatting. Swipe right on a message to reply.
-                </div>
-            </div>
+      <section id="contact" class="contact section-wrap" aria-labelledby="contact-title"><div><span class="eyebrow">05 / say hello</span><h2 id="contact-title">Have something<br /><em>interesting to build?</em></h2></div><div class="contact-links"><p>I’m always up for a good problem, a thoughtful collaboration, or a conversation about cameras and code.</p><a class="contact-email" href="mailto:hello@kekeli.dev">hello@kekeli.dev <span>↗</span></a><div class="social-links"><a href="https://github.com/kekeli101" target="_blank" rel="noreferrer">GitHub ↗</a><a href="https://www.linkedin.com" target="_blank" rel="noreferrer">LinkedIn ↗</a><a href="#photography">Shot by Kels ↘</a></div></div></section>
+    </main>
 
-            <!-- Reply Container -->
-            <div class="reply-container" id="reply-container">
-                <div class="reply-content">
-                    <div class="reply-text">
-                        <span class="reply-username" id="reply-username"></span>
-                        <span id="reply-message"></span>
-                    </div>
-                    <button id="cancel-reply" class="btn-icon" title="Cancel reply">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Typing Indicator -->
-            <div class="typing-indicator" id="typing-indicator"></div>
-
-            <!-- Scroll to Bottom Button -->
-            <button id="scroll-to-bottom-btn" class="btn-icon scroll-to-bottom-btn" title="Scroll to bottom">
-                <i class="fas fa-chevron-down"></i>
-            </button>
-
-            <div class="ad-container ad-container--chat">
-                <ins class="adsbygoogle"
-                     style="display:block"
-                     data-ad-client="ca-pub-8537594804200864"
-                     data-ad-slot="REPLACE_WITH_YOUR_AD_SLOT"
-                     data-ad-format="horizontal"
-                     data-full-width-responsive="true"></ins>
-            </div>
-
-            <!-- Chat Input Area -->
-            <div class="chat-input-container">
-                <div class="chat-input">
-                    <input 
-                        type="text" 
-                        id="message-input" 
-                        placeholder="Type a message..."
-                        autocomplete="off"
-                    >
-                </div>
-                <button id="send-message-btn" class="send-btn" title="Send message">
-                    <i class="fas fa-paper-plane"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast notifications -->
-    <div id="toast-container" class="toast-container" aria-live="polite"></div>
-
-    <!-- Modal: room created (save delete PIN) -->
-    <div id="room-created-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-        <div class="modal-card">
-            <h2><i class="fas fa-check-circle"></i> Room created!</h2>
-            <p class="modal-text" id="room-created-modal-text">Save this code before entering the room.</p>
-            <div class="pin-display" id="created-pin-display">000000</div>
-            <p class="modal-subtext" id="room-created-modal-subtext">Room: <span id="created-room-name-label"></span></p>
-            <div class="modal-actions">
-                <button type="button" class="btn secondary" id="copy-created-pin-btn"><i class="fas fa-copy"></i> Copy key</button>
-                <button type="button" class="btn primary" id="enter-created-room-btn">Enter room</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: enter PIN (delete / admin) -->
-    <div id="pin-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-        <div class="modal-card">
-            <h2 id="pin-modal-title">Enter delete PIN</h2>
-            <p class="modal-text" id="pin-modal-desc">Enter the 6-digit PIN for this room.</p>
-            <input type="text" id="pin-modal-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="6-digit PIN" autocomplete="off">
-            <p class="field-error hidden" id="pin-modal-error"></p>
-            <div class="modal-actions">
-                <button type="button" class="btn secondary" id="pin-modal-cancel">Cancel</button>
-                <button type="button" class="btn primary" id="pin-modal-confirm">Continue</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: confirm delete -->
-    <div id="confirm-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-        <div class="modal-card">
-            <h2><i class="fas fa-triangle-exclamation"></i> Delete room?</h2>
-            <p class="modal-text">This removes the room for everyone. This cannot be undone.</p>
-            <div class="modal-actions">
-                <button type="button" class="btn secondary" id="confirm-modal-cancel">Cancel</button>
-                <button type="button" class="btn danger" id="confirm-modal-ok">Delete room</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: simple message -->
-    <div id="alert-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-        <div class="modal-card">
-            <h2 id="alert-modal-title">Notice</h2>
-            <p class="modal-text" id="alert-modal-message"></p>
-            <div class="modal-actions">
-                <button type="button" class="btn primary" id="alert-modal-ok">OK</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Socket.IO and App Scripts -->
-    <script src="/socket.io/socket.io.js"></script>
+    <footer class="site-footer section-wrap"><span>© 2026 Kekeli</span><span>Made with attention, not a template.</span><a href="#top">Back to top ↑</a></footer>
+    <div class="photo-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden><div class="modal-inner"><button class="modal-close" type="button" aria-label="Close">×</button><span class="eyebrow">photography archive</span><h2 id="modal-title">Coming soon.</h2><p>The actual photographs will live here once the archive is ready. No filler images — promise.</p></div></div>
     <script src="app.js"></script>
-</body>
+  </body>
 </html>
