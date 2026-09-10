@@ -1585,3 +1585,124 @@ input:focus-visible,
         transition-duration: 0.01ms !important;
     }
 }
+
+
+/* ============================================
+   DESKTOP LANDING COMPOSITION
+   ============================================ */
+
+@media (min-width: 769px) {
+    #greeting-page .container {
+        width: min(100%, 1080px);
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-content: start;
+        align-items: start;
+        column-gap: clamp(1.25rem, 3vw, 2.5rem);
+        row-gap: 1.25rem;
+        padding-top: clamp(3rem, 8vh, 6rem);
+    }
+
+    #greeting-page .container > h1,
+    #greeting-page .container > .hero-text,
+    #greeting-page .container > .ad-container {
+        grid-column: 1 / -1;
+        justify-self: center;
+    }
+
+    #greeting-page .container > h1 {
+        margin-bottom: -0.25rem;
+    }
+
+    #greeting-page .container > .hero-text {
+        margin-bottom: 0.5rem;
+    }
+
+    #greeting-page .create-public-form,
+    #greeting-page .section-card:not(.create-public-form):not(.public-rooms-section) {
+        width: 100%;
+        min-height: 100%;
+    }
+
+    #greeting-page .create-public-form {
+        grid-column: 1;
+        grid-row: 3;
+    }
+
+    #greeting-page .section-card:not(.create-public-form):not(.public-rooms-section) {
+        grid-column: 2;
+        grid-row: 3;
+    }
+
+    #greeting-page .public-rooms-section {
+        grid-column: 1 / -1;
+        grid-row: 4;
+        padding: 0 0.25rem;
+    }
+
+    #greeting-page .public-rooms-list {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        max-height: 220px;
+    }
+
+    #greeting-page .ad-container--landing {
+        grid-row: 5;
+        margin-top: 0.25rem;
+    }
+}
+
+@media (min-width: 1200px) {
+    #greeting-page .container {
+        width: min(100%, 1160px);
+    }
+
+    #greeting-page .create-public-form,
+    #greeting-page .section-card:not(.create-public-form):not(.public-rooms-section) {
+        padding: 1.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    #greeting-page .container {
+        display: flex;
+    }
+}
+
+
+@media (min-width: 769px) {
+    #greeting-page .create-public-form {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.65rem;
+    }
+
+    #greeting-page .create-public-form .section-title,
+    #greeting-page .create-public-form .hint-text,
+    #greeting-page .create-public-form label,
+    #greeting-page .create-public-form input,
+    #greeting-page .create-public-form .field-error,
+    #greeting-page .create-public-form .btn {
+        grid-column: auto;
+        grid-row: auto;
+    }
+
+    #greeting-page .create-public-form .btn {
+        align-self: stretch;
+        width: 100%;
+        margin-top: 0.25rem;
+    }
+}
+
+
+@media (min-width: 769px) {
+    #greeting-page .container {
+        max-width: 1080px;
+    }
+}
+
+@media (min-width: 1200px) {
+    #greeting-page .container {
+        max-width: 1160px;
+    }
+}
