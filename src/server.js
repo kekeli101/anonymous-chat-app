@@ -301,59 +301,69 @@ io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
   socket.on('createRoom', async (data = {}) => {
-    const type = data.type === 'public' ? 'public' : 'private';
-    const roomName = (data.name || '').toString().trim().slice(0, 50);
+    try {
+      const type = data.type === 'public' ? 'public' : 'private';
+      const roomName = (data.name || '').toString().trim().slice(0, 50);
 
-    if (type === 'public' && !roomName) {
-      socket.emit('error', { message: 'Please enter a room name before creating' });
-      return;
-    }
-
-    const roomKey = type === 'public' ? await generatePublicId() : await generatePrivateKey();
-    const deleteCode = type === 'private' ? roomKey : generateDeleteCode();
-    const username = generateUsername();
-
-    const room = {
-      type,
-      name: type === 'public' ? roomName : null,
-      deleteCode,
-      creator: socket.id,
-      admins: new Set([socket.id]),
-      users: new Map([[socket.id, username]]),
-      createdAt: new Date(),
-      lastActivity: new Date(),
-      emptySince: null,
-      messages: []
-    };
-
-    activeRooms.set(roomKey, room);
-
-    if (dbEnabled) {
-      const saved = await db.insertRoom(roomKey, room);
-      if (!saved) {
-        activeRooms.delete(roomKey);
-        socket.emit('error', { message: 'Failed to create room. Please try again.' });
+      if (type === 'public' && !roomName) {
+        socket.emit('error', { message: 'Please enter a room name before creating' });
         return;
       }
+
+      const roomKey = type === 'public' ? await generatePublicId() : await generatePrivateKey();
+      const deleteCode = type === 'private' ? roomKey : generateDeleteCode();
+      const username = generateUsername();
+
+      const room = {
+        type,
+        name: type === 'public' ? roomName : null,
+        deleteCode,
+        creator: socket.id,
+        admins: new Set([socket.id]),
+        users: new Map([[socket.id, username]]),
+        createdAt: new Date(),
+        lastActivity: new Date(),
+        emptySince: null,
+        messages: []
+      };
+
+      activeRooms.set(roomKey, room);
+
+      if (dbEnabled) {
+        let saved = false;
+        try {
+          saved = await db.insertRoom(roomKey, room);
+        } catch (err) {
+          console.error(`Room persistence threw for ${roomKey}:`, err.message || err);
+        }
+        if (!saved) {
+          // Keep the live room available while Supabase is unavailable. It can
+          // still be used by connected clients and will be logged for repair.
+          console.error(`Room ${roomKey} created in memory; database persistence failed`);
+        }
+      }
+
+      socket.join(roomKey);
+
+      socket.emit('roomCreated', {
+        roomKey,
+        type,
+        name: room.name,
+        deleteCode,
+        username,
+        isAdmin: true,
+        userCount: 1
+      });
+
+      if (type === 'public') {
+        broadcastPublicRooms();
+      }
+
+      console.log(`${type} room created: ${roomKey} (${roomName || 'private'}) by ${username} (${socket.id})`);
+    } catch (err) {
+      console.error(`Room creation failed for ${socket.id}:`, err.stack || err);
+      socket.emit('error', { message: 'Unable to create the room right now. Please try again.' });
     }
-
-    socket.join(roomKey);
-
-    socket.emit('roomCreated', {
-      roomKey,
-      type,
-      name: room.name,
-      deleteCode,
-      username,
-      isAdmin: true,
-      userCount: 1
-    });
-
-    if (type === 'public') {
-      broadcastPublicRooms();
-    }
-
-    console.log(`${type} room created: ${roomKey} (${roomName || 'private'}) by ${username} (${socket.id})`);
   });
 
   socket.on('joinRoom', async (data) => {

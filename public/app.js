@@ -96,6 +96,7 @@ const socket = io({
   let pinModalCallback = null;
   let pinModalAllowAnyKey = false;
   let confirmModalCallback = null;
+  let createRoomTimeout = null;
   
   const typingUsers = new Set();
 
@@ -195,6 +196,20 @@ const socket = io({
       button.disabled = false;
       button.innerHTML = button.dataset.defaultHtml || defaultHtml;
     }
+  }
+
+  function startCreateRoomTimeout() {
+    clearTimeout(createRoomTimeout);
+    createRoomTimeout = setTimeout(() => {
+      setButtonLoading(createPublicBtn, false, '<i class="fas fa-globe"></i> Create Public Room');
+      setButtonLoading(createPrivateBtn, false, '<i class="fas fa-lock"></i> Create Private Room');
+      showToast('Room creation timed out. Check your connection and try again.', 'error');
+    }, 15000);
+  }
+
+  function clearCreateRoomTimeout() {
+    clearTimeout(createRoomTimeout);
+    createRoomTimeout = null;
   }
   
   // --- Delete code persistence (store it — you need it to delete the room) ---
@@ -635,6 +650,7 @@ const socket = io({
       return;
     }
     setButtonLoading(createPublicBtn, true, '<i class="fas fa-globe"></i> Create Public Room');
+    startCreateRoomTimeout();
     socket.emit('createRoom', { type: 'public', name: roomName });
   });
 
@@ -647,6 +663,7 @@ const socket = io({
   
   createPrivateBtn.addEventListener('click', () => {
     setButtonLoading(createPrivateBtn, true, '<i class="fas fa-lock"></i> Create Private Room');
+    startCreateRoomTimeout();
     socket.emit('createRoom', { type: 'private' });
   });
   
@@ -822,6 +839,7 @@ const socket = io({
   // --- Socket.IO handlers ------------------------------------------------------
   
   socket.on('roomCreated', (data) => {
+    clearCreateRoomTimeout();
     setButtonLoading(createPublicBtn, false, '<i class="fas fa-globe"></i> Create Public Room');
     setButtonLoading(createPrivateBtn, false, '<i class="fas fa-lock"></i> Create Private Room');
     publicRoomNameInput.value = '';
@@ -988,6 +1006,7 @@ const socket = io({
   });
   
   socket.on('error', (data) => {
+    clearCreateRoomTimeout();
     setButtonLoading(createPublicBtn, false, '<i class="fas fa-globe"></i> Create Public Room');
     setButtonLoading(createPrivateBtn, false, '<i class="fas fa-lock"></i> Create Private Room');
     setButtonLoading(joinSubmitBtn, false, '<i class="fas fa-sign-in-alt"></i> Join');
@@ -1001,6 +1020,13 @@ const socket = io({
     }
   });
   
+  socket.on('connect_error', () => {
+    clearCreateRoomTimeout();
+    setButtonLoading(createPublicBtn, false, '<i class="fas fa-globe"></i> Create Public Room');
+    setButtonLoading(createPrivateBtn, false, '<i class="fas fa-lock"></i> Create Private Room');
+    showToast('Connection failed. Please try again.', 'error');
+  });
+
   // Silent rejoin after a dropped connection (new socket id => re-add to room)
   socket.on('reconnect', () => {
     if (currentRoom) {
